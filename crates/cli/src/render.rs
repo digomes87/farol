@@ -2,7 +2,7 @@
 
 use std::io::IsTerminal;
 
-use farol_core::{SearchResult, Stats};
+use farol_core::{SearchResult, SearchStats, Stats, Strategy};
 
 /// ANSI styling, disabled when stdout is not a terminal so piped output stays
 /// clean and greppable.
@@ -77,12 +77,41 @@ pub fn results(results: &[SearchResult], query: &str, elapsed_ms: f64, style: &S
     out
 }
 
+/// Renders how the query was evaluated: which strategy ran, how many documents
+/// matched, and how many of them actually had to be scored.
+pub fn explain(stats: &SearchStats, style: &Style) -> String {
+    let strategy = match stats.strategy {
+        Strategy::Wand => "wand (dynamic pruning)",
+        Strategy::Exhaustive => "exhaustive",
+    };
+    let saved = if stats.candidates > 0 {
+        100.0 * (1.0 - stats.scored as f64 / stats.candidates as f64)
+    } else {
+        0.0
+    };
+    style.dim(&format!(
+        "strategy: {strategy} · candidates: {} · scored: {} · skipped: {} ({saved:.0}% avoided)\n\n",
+        stats.candidates, stats.scored, stats.pruned
+    ))
+}
+
 /// Renders results as JSON, for piping into `jq` or another program.
-pub fn results_json(results: &[SearchResult], query: &str, elapsed_ms: f64) -> String {
+pub fn results_json(
+    results: &[SearchResult],
+    query: &str,
+    elapsed_ms: f64,
+    stats: &SearchStats,
+) -> String {
     let payload = serde_json::json!({
         "query": query,
         "elapsed_ms": elapsed_ms,
         "count": results.len(),
+        "strategy": match stats.strategy {
+            Strategy::Wand => "wand",
+            Strategy::Exhaustive => "exhaustive",
+        },
+        "candidates": stats.candidates,
+        "scored": stats.scored,
         "results": results
             .iter()
             .map(|r| serde_json::json!({
@@ -144,11 +173,30 @@ mod tests {
         assert!(text.contains("no results"));
     }
 
+    fn stats_sample() -> SearchStats {
+        SearchStats {
+            scored: 3,
+            candidates: 12,
+            pruned: 9,
+            strategy: Strategy::Wand,
+        }
+    }
+
     #[test]
     fn json_output_is_valid_and_complete() {
-        let text = results_json(&sample(), "safety", 2.0);
+        let text = results_json(&sample(), "safety", 2.0, &stats_sample());
         let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert_eq!(parsed["count"], 1);
         assert_eq!(parsed["results"][0]["title"], "Rust");
+        assert_eq!(parsed["strategy"], "wand");
+        assert_eq!(parsed["scored"], 3);
+    }
+
+    #[test]
+    fn explain_reports_the_share_of_work_avoided() {
+        let style = Style::detect(Some(false));
+        let text = explain(&stats_sample(), &style);
+        assert!(text.contains("wand"), "{text}");
+        assert!(text.contains("75% avoided"), "{text}");
     }
 }

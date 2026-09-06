@@ -70,6 +70,34 @@ fn ranking_parameters_are_wired_through() {
 }
 
 #[test]
+fn explain_reports_the_evaluation_strategy() {
+    let dir = tempfile::tempdir().unwrap();
+    let index = indexed(dir.path());
+
+    let optional = farol(&["search", "index positions", "-i", &index, "--explain"]);
+    assert!(stdout(&optional).contains("wand"), "{}", stdout(&optional));
+
+    // A required clause cannot be pruned safely and must say so.
+    let required = farol(&["search", "+index positions", "-i", &index, "--explain"]);
+    assert!(
+        stdout(&required).contains("exhaustive"),
+        "{}",
+        stdout(&required)
+    );
+}
+
+#[test]
+fn json_output_carries_the_evaluation_counters() {
+    let dir = tempfile::tempdir().unwrap();
+    let index = indexed(dir.path());
+
+    let output = farol(&["search", "index positions", "-i", &index, "--json"]);
+    let parsed: serde_json::Value = serde_json::from_str(&stdout(&output)).unwrap();
+    assert_eq!(parsed["strategy"], "wand");
+    assert!(parsed["scored"].as_u64().unwrap() <= parsed["candidates"].as_u64().unwrap());
+}
+
+#[test]
 fn a_missing_index_fails_with_a_helpful_message() {
     let output = farol(&["search", "rust", "-i", "/tmp/does-not-exist.idx"]);
     assert!(!output.status.success());

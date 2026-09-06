@@ -2,8 +2,8 @@
 
 A full-text search engine written in Rust from first principles — no Lucene, no
 Tantivy, no search dependency. Text analysis, a positional inverted index, BM25
-ranking, boolean queries with exact phrases and highlighted snippets, in roughly
-2,000 lines of tested Rust.
+ranking, WAND dynamic pruning, boolean queries with exact phrases and
+highlighted snippets, in roughly 2,500 lines of tested Rust.
 
 [![CI](https://github.com/digomes87/farol/actions/workflows/ci.yml/badge.svg)](https://github.com/digomes87/farol/actions/workflows/ci.yml)
 ![Rust](https://img.shields.io/badge/rust-1.75%2B-orange)
@@ -61,6 +61,8 @@ farol search '+rust -java' -n 20      # required and excluded, 20 results
 farol search 'bm25' --json | jq       # output for another program
 farol search 'bm25' --k1 1.6 --b 0.3  # tune the ranking
 
+farol search 'bm25 ranking' --explain # show how the query was evaluated
+
 farol repl                            # interactive session, index kept in memory
 farol stats                           # index counters
 ```
@@ -98,14 +100,44 @@ Every stage is a module with a single responsibility:
 | `analyzer` | text → normalized terms, with position and source offset |
 | `index` | term → sorted posting list, with positions and document lengths |
 | `query` | query string → `Must` / `Should` / `MustNot` clauses |
-| `searcher` | clauses + index → ranked documents |
+| `searcher` | clauses + index → ranked documents, exhaustive or pruned |
 | `bm25` | postings → relevance score |
+| `cursor` | skip-capable iteration over a posting list |
+| `topk` | bounded collector for the best k hits |
 | `snippet` | matched document → highlighted excerpt |
 | `store` | index ↔ a single self-describing file |
 | `engine` | the façade tying it all together |
 
 The reasoning behind each design decision is in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## Dynamic pruning (WAND)
+
+Scoring every matching document to show ten of them is wasted work. For queries
+of optional terms, `farol` runs **WAND**: it keeps one cursor per term, tracks
+the score of the tenth best document found so far, and uses each term's maximum
+possible contribution to prove that entire stretches of the posting lists cannot
+beat it. Those documents are skipped without ever being scored.
+
+```console
+$ farol search "term0 term1 term2" --explain -n 5
+strategy: wand (dynamic pruning) · candidates: 813 · scored: 104 · skipped: 709 (87% avoided)
+```
+
+The upper bounds come from the index itself: for every term it stores the
+highest frequency and the shortest document length observed across its postings.
+BM25 grows with frequency and shrinks with length, so that pair bounds the
+term's contribution to *any* document — and the bound holds for every `k1`/`b`,
+which is why it survives runtime tuning of the ranking.
+
+Queries with required, excluded or phrase clauses fall back to exhaustive
+evaluation: those clauses already constrain the candidate set, usually harder
+than pruning would.
+
+Both strategies return the same ranking, and that is enforced by tests rather
+than assumed — see `pruning_and_exhaustive_scoring_return_the_same_ranking` in
+[`crates/core/src/searcher.rs`](crates/core/src/searcher.rs). `--pruning` can be
+turned off through the library API (`Searcher::with_pruning`) to A/B the two.
 
 ## Performance
 
@@ -121,14 +153,22 @@ The reasoning behind each design decision is in
 | Two required terms (intersection) | **10 µs** |
 | Two term phrase | 2.4 µs |
 
-The line that matters is the union/intersection pair: the same query with `+`
-costs 4× less, because the candidate set comes from intersecting the required
-posting lists and BM25 then runs over far fewer documents.
+Same query, same candidate set, pruning on and off:
+
+| Query | Exhaustive | WAND | Speedup |
+|-------|-----------|------|---------|
+| `term0 term1` | 35.7 µs | **11.2 µs** | 3.2× |
+| `term0 term1 term2 term3` | 74.5 µs | **29.6 µs** | 2.5× |
+
+Two effects are worth separating. The union/intersection pair in the first table
+shows the value of choosing candidates from the required clauses — the same
+query with `+` costs 4× less. The table above shows what pruning buys on top of
+that for queries where no such clause exists.
 
 ## Development
 
 ```bash
-cargo test --workspace      # 87 tests: unit, doc, relevance and end-to-end
+cargo test --workspace      # 112 tests: unit, doc, relevance and end-to-end
 cargo bench -p farol-core   # criterion benchmarks
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all --check

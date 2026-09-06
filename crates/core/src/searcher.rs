@@ -13,8 +13,10 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::bm25::Bm25;
+use crate::cursor::PostingCursor;
 use crate::index::{DocId, Index, Posting};
 use crate::query::{ClauseKind, Occur, Query};
+use crate::topk::TopK;
 
 /// One ranked document.
 #[derive(Debug, Clone, PartialEq)]
@@ -25,6 +27,35 @@ pub struct Hit {
     pub score: f32,
 }
 
+/// What a query actually did, for benchmarking and for `--explain` style output.
+///
+/// `scored` versus `candidates` is the whole story of dynamic pruning: both
+/// strategies return the same ranking, but WAND reaches it while fully scoring
+/// a fraction of the documents that match.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct SearchStats {
+    /// Documents that were fully scored with BM25.
+    pub scored: usize,
+    /// Documents that matched at least one clause.
+    pub candidates: usize,
+    /// Documents skipped because their score bound could not reach the
+    /// threshold. Always zero for the exhaustive strategy.
+    pub pruned: usize,
+    /// Which evaluation strategy ran.
+    pub strategy: Strategy,
+}
+
+/// How a query was evaluated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Strategy {
+    /// Every matching document is scored, then ranked.
+    #[default]
+    Exhaustive,
+    /// Documents whose maximum possible score cannot reach the current
+    /// threshold are skipped without ever being scored.
+    Wand,
+}
+
 /// Executes queries against an [`Index`].
 ///
 /// Borrowing the index keeps the searcher cheap to create: one per query is
@@ -33,6 +64,7 @@ pub struct Hit {
 pub struct Searcher<'a> {
     index: &'a Index,
     bm25: Bm25,
+    pruning: bool,
 }
 
 impl<'a> Searcher<'a> {
@@ -40,12 +72,23 @@ impl<'a> Searcher<'a> {
         Self {
             index,
             bm25: Bm25::default(),
+            pruning: true,
         }
     }
 
     /// Overrides the ranking parameters.
     pub fn with_bm25(mut self, bm25: Bm25) -> Self {
         self.bm25 = bm25;
+        self
+    }
+
+    /// Enables or disables dynamic pruning.
+    ///
+    /// Both strategies return the same ranking, so this is not a quality knob:
+    /// it exists to A/B the two implementations in benchmarks and to isolate
+    /// pruning when a ranking bug is being tracked down.
+    pub fn with_pruning(mut self, pruning: bool) -> Self {
+        self.pruning = pruning;
         self
     }
 
@@ -58,10 +101,132 @@ impl<'a> Searcher<'a> {
     /// Ties are broken by document id so results are stable across runs — a
     /// property worth having whenever output is diffed or snapshot tested.
     pub fn search(&self, query: &Query, limit: usize) -> Vec<Hit> {
+        self.search_with_stats(query, limit).0
+    }
+
+    /// Same as [`search`](Searcher::search), also reporting how the query was
+    /// evaluated.
+    ///
+    /// The strategy is picked from the query shape. A query of purely optional
+    /// terms is the case dynamic pruning was designed for, and gets WAND.
+    /// Anything with a required, excluded or phrase clause falls back to
+    /// exhaustive evaluation: those clauses constrain the candidate set by
+    /// themselves, and the intersection they produce is usually smaller than
+    /// what pruning would save.
+    pub fn search_with_stats(&self, query: &Query, limit: usize) -> (Vec<Hit>, SearchStats) {
         if self.index.is_empty() || limit == 0 {
-            return Vec::new();
+            return (Vec::new(), SearchStats::default());
+        }
+        if self.is_prunable(query) {
+            return self.search_wand(query, limit);
+        }
+        self.search_exhaustive(query, limit)
+    }
+
+    /// WAND is only applicable when every clause is an optional single term.
+    fn is_prunable(&self, query: &Query) -> bool {
+        self.pruning
+            && query
+                .clauses
+                .iter()
+                .all(|c| c.occur == Occur::Should && matches!(c.kind, ClauseKind::Term(_)))
+    }
+
+    /// Weak AND: scores a document only when the terms known to be positioned
+    /// on it *could* together beat the current threshold.
+    ///
+    /// The loop keeps one cursor per term, sorted by the document each points
+    /// at, and adds up their upper bounds in that order. The first term whose
+    /// running sum exceeds the threshold is the *pivot*: no document before the
+    /// pivot's current document can possibly score high enough, because the
+    /// terms positioned there are exactly the ones whose bounds have not yet
+    /// added up. So the loop either scores the pivot document — when every
+    /// preceding cursor is already on it — or skips those cursors straight to
+    /// it, never touching what lies in between.
+    fn search_wand(&self, query: &Query, limit: usize) -> (Vec<Hit>, SearchStats) {
+        let mut cursors: Vec<PostingCursor<'_>> = Vec::new();
+        let mut candidates: HashSet<DocId> = HashSet::new();
+
+        for clause in &query.clauses {
+            let ClauseKind::Term(term) = &clause.kind else {
+                continue;
+            };
+            let Some(term_index) = self.index.term(term) else {
+                continue;
+            };
+            let idf = self.bm25.idf(term_index.doc_freq(), self.index.len());
+            let upper_bound = self.bm25.score(
+                term_index.max_tf(),
+                term_index.min_len(),
+                self.index.avg_doc_len(),
+                idf,
+            );
+            candidates.extend(term_index.postings().iter().map(|p| p.doc));
+            cursors.push(PostingCursor::new(term_index.postings(), idf, upper_bound));
         }
 
+        let mut stats = SearchStats {
+            candidates: candidates.len(),
+            strategy: Strategy::Wand,
+            ..SearchStats::default()
+        };
+        if cursors.is_empty() {
+            return (Vec::new(), stats);
+        }
+
+        let avg = self.index.avg_doc_len();
+        let mut topk = TopK::new(limit);
+
+        loop {
+            // Exhausted cursors sort to the end and are then cut away.
+            cursors.sort_unstable_by_key(|c| c.doc().unwrap_or(DocId::MAX));
+            cursors.retain(|c| !c.is_exhausted());
+            if cursors.is_empty() {
+                break;
+            }
+
+            let threshold = topk.threshold();
+            let Some(pivot) = find_pivot(&cursors, threshold) else {
+                // Not even every remaining term together can beat the
+                // threshold: nothing left in the index can enter the top k.
+                stats.pruned += cursors.iter().map(PostingCursor::remaining).sum::<usize>();
+                break;
+            };
+            let pivot_doc = cursors[pivot].doc().expect("pivot cursor is not exhausted");
+
+            if cursors[0].doc() == Some(pivot_doc) {
+                // Every cursor up to the pivot is on this document: score it.
+                let len = self.index.document(pivot_doc).map_or(0, |d| d.length);
+                let score: f32 = cursors
+                    .iter()
+                    .take_while(|c| c.doc() == Some(pivot_doc))
+                    .map(|c| self.bm25.score(c.tf(), len, avg, c.idf()))
+                    .sum();
+                stats.scored += 1;
+                topk.offer(pivot_doc, score);
+
+                for cursor in cursors.iter_mut() {
+                    if cursor.doc() == Some(pivot_doc) {
+                        cursor.advance();
+                    }
+                }
+            } else {
+                // Skip the lagging cursors straight to the pivot document.
+                for cursor in cursors[..pivot].iter_mut() {
+                    if cursor.doc().is_some_and(|doc| doc < pivot_doc) {
+                        let before = cursor.remaining();
+                        cursor.advance_to(pivot_doc);
+                        stats.pruned += before - cursor.remaining();
+                    }
+                }
+            }
+        }
+
+        (topk.into_sorted(), stats)
+    }
+
+    /// Scores every document that matches at least one clause.
+    fn search_exhaustive(&self, query: &Query, limit: usize) -> (Vec<Hit>, SearchStats) {
         let mut required: Option<HashSet<DocId>> = None;
         let mut optional: HashSet<DocId> = HashSet::new();
         let mut excluded: HashSet<DocId> = HashSet::new();
@@ -94,8 +259,13 @@ impl<'a> Searcher<'a> {
             Some(required) => required,
             None => optional,
         };
+        let mut stats = SearchStats {
+            candidates: candidates.len(),
+            strategy: Strategy::Exhaustive,
+            ..SearchStats::default()
+        };
         if candidates.is_empty() {
-            return Vec::new();
+            return (Vec::new(), stats);
         }
 
         let avg = self.index.avg_doc_len();
@@ -110,18 +280,16 @@ impl<'a> Searcher<'a> {
             }
         }
 
-        let mut hits: Vec<Hit> = scores
-            .into_iter()
-            .map(|(doc, score)| Hit { doc, score })
-            .collect();
-        hits.sort_unstable_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then(a.doc.cmp(&b.doc))
-        });
-        hits.truncate(limit);
-        hits
+        stats.scored = scores.len();
+        let mut topk = TopK::new(limit);
+        // Offer in ascending id order so ties resolve the same way WAND
+        // resolves them.
+        let mut scored: Vec<(DocId, f32)> = scores.into_iter().collect();
+        scored.sort_unstable_by_key(|(doc, _)| *doc);
+        for (doc, score) in scored {
+            topk.offer(doc, score);
+        }
+        (topk.into_sorted(), stats)
     }
 
     /// Resolves a clause into the documents it matches and how often.
@@ -203,6 +371,22 @@ fn count_phrase_occurrences(aligned: &[(&[u32], u32)]) -> u32 {
         }
     }
     count
+}
+
+/// Finds the first cursor whose accumulated upper bound exceeds `threshold`.
+///
+/// `cursors` must be sorted by current document. Returns `None` when even the
+/// sum of every remaining bound cannot beat the threshold, which means the
+/// search is finished.
+fn find_pivot(cursors: &[PostingCursor<'_>], threshold: f32) -> Option<usize> {
+    let mut accumulated = 0.0;
+    for (idx, cursor) in cursors.iter().enumerate() {
+        accumulated += cursor.upper_bound();
+        if accumulated > threshold {
+            return Some(idx);
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -301,6 +485,140 @@ mod tests {
         let ranked = run("rust search engine", 10);
         assert!(ranked.iter().all(|(_, score)| *score > 0.0));
         assert!(ranked.windows(2).all(|w| w[0].1 >= w[1].1));
+    }
+
+    /// A corpus with a skewed term distribution: `term0` is everywhere, the
+    /// rare terms appear in a handful of documents. Uniform frequencies would
+    /// make every posting list the same length and hide what pruning does.
+    fn skewed_index(docs: usize) -> Index {
+        let mut index = Index::new(Analyzer::raw());
+        for id in 0..docs {
+            let mut text = String::new();
+            for term in 0..8 {
+                // Term `t` appears in every `2^t`-th document.
+                if id % (1 << term) == 0 {
+                    for _ in 0..=(term % 3) {
+                        text.push_str(&format!("term{term} "));
+                    }
+                }
+            }
+            text.push_str(&format!("filler{} padding words here", id % 7));
+            index.add(format!("d{id}"), format!("Doc {id}"), &text);
+        }
+        index.finish();
+        index
+    }
+
+    #[test]
+    fn pruning_and_exhaustive_scoring_return_the_same_ranking() {
+        let index = skewed_index(500);
+        let analyzer = Analyzer::raw();
+        let searcher = Searcher::new(&index);
+
+        let queries = [
+            "term0",
+            "term0 term1",
+            "term3 term7",
+            "term0 term2 term5",
+            "term1 term2 term3 term4 term5 term6 term7",
+            "filler3 term0",
+            "missing term0",
+        ];
+
+        for input in queries {
+            let query = Query::parse(input, &analyzer).unwrap();
+            for limit in [1, 3, 10, 50] {
+                let (pruned, stats) = searcher.search_with_stats(&query, limit);
+                let (exhaustive, _) = searcher.search_exhaustive(&query, limit);
+
+                assert_eq!(stats.strategy, Strategy::Wand, "`{input}` should prune");
+                assert_eq!(
+                    pruned.len(),
+                    exhaustive.len(),
+                    "`{input}` limit {limit}: different result count"
+                );
+                for (a, b) in pruned.iter().zip(&exhaustive) {
+                    assert_eq!(a.doc, b.doc, "`{input}` limit {limit}: different ranking");
+                    assert!(
+                        (a.score - b.score).abs() < 1e-4,
+                        "`{input}` limit {limit}: doc {} scored {} vs {}",
+                        a.doc,
+                        a.score,
+                        b.score
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn pruning_scores_far_fewer_documents_than_it_matches() {
+        let index = skewed_index(2_000);
+        let analyzer = Analyzer::raw();
+        let query = Query::parse("term0 term4 term6", &analyzer).unwrap();
+
+        let (_, stats) = Searcher::new(&index).search_with_stats(&query, 10);
+
+        assert_eq!(stats.strategy, Strategy::Wand);
+        assert!(
+            stats.scored < stats.candidates / 2,
+            "scored {} of {} candidates — pruning is not paying off",
+            stats.scored,
+            stats.candidates
+        );
+        assert!(stats.pruned > 0);
+    }
+
+    #[test]
+    fn pruning_can_be_turned_off_without_changing_the_ranking() {
+        let index = skewed_index(300);
+        let analyzer = Analyzer::raw();
+        let query = Query::parse("term0 term2 term5", &analyzer).unwrap();
+
+        let (pruned, wand) = Searcher::new(&index).search_with_stats(&query, 10);
+        let (plain, exhaustive) = Searcher::new(&index)
+            .with_pruning(false)
+            .search_with_stats(&query, 10);
+
+        assert_eq!(wand.strategy, Strategy::Wand);
+        assert_eq!(exhaustive.strategy, Strategy::Exhaustive);
+        assert_eq!(
+            pruned.iter().map(|h| h.doc).collect::<Vec<_>>(),
+            plain.iter().map(|h| h.doc).collect::<Vec<_>>()
+        );
+        assert!(wand.scored < exhaustive.scored);
+    }
+
+    #[test]
+    fn constrained_queries_fall_back_to_exhaustive_evaluation() {
+        let index = index();
+        let analyzer = Analyzer::raw();
+        for input in ["+rust search", "rust -java", "\"search engine\""] {
+            let query = Query::parse(input, &analyzer).unwrap();
+            let (_, stats) = Searcher::new(&index).search_with_stats(&query, 10);
+            assert_eq!(
+                stats.strategy,
+                Strategy::Exhaustive,
+                "`{input}` cannot be pruned safely"
+            );
+        }
+    }
+
+    #[test]
+    fn a_smaller_limit_prunes_more() {
+        let index = skewed_index(2_000);
+        let analyzer = Analyzer::raw();
+        let query = Query::parse("term0 term1 term2", &analyzer).unwrap();
+        let searcher = Searcher::new(&index);
+
+        let (_, tight) = searcher.search_with_stats(&query, 1);
+        let (_, loose) = searcher.search_with_stats(&query, 100);
+        assert!(
+            tight.scored < loose.scored,
+            "asking for fewer results scored {} vs {}",
+            tight.scored,
+            loose.scored
+        );
     }
 
     #[test]

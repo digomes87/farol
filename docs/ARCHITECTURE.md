@@ -12,6 +12,7 @@ are independent enough to be tested alone.
 ```text
 indexing:  files  → analyzer → shards → merge → index → disk
 querying:  string → parser   → clauses → filter → BM25 → snippet
+                                      ↳ optional terms → WAND → top-k
 ```
 
 The `farol-core` crate holds the entire pipeline and does not depend on the CLI.
@@ -65,7 +66,36 @@ Phrase matching follows the same logic: it starts from the posting list of the
 rarest term, which bounds how many documents can match, and verifies the rest by
 binary search over positions.
 
-### 5. Snippets re-analyze the document
+### 5. Dynamic pruning is opt-in by query shape
+
+The top-k of a query is decided by a handful of documents, yet exhaustive
+scoring pays for all of them. WAND avoids that: the cursors are kept sorted by
+the document they point at, their upper bounds are accumulated in that order,
+and the first term whose running sum exceeds the current threshold marks the
+*pivot*. No document before the pivot's current document can beat the threshold,
+because the only terms positioned there are the ones whose bounds have not added
+up yet — so the loop either scores the pivot document or skips the lagging
+cursors straight to it.
+
+Three details make the implementation honest:
+
+- **The bounds live in the index, not in the query.** Each term stores the
+  highest frequency and the shortest document length among its postings. BM25 is
+  monotonic in both, so the pair is a valid bound for any `k1`/`b`, and runtime
+  tuning of the ranking cannot invalidate it.
+- **The skip is a galloping search**, not a linear scan or a binary search over
+  the whole tail. A query mixes rare terms (long skips) with frequent ones
+  (short skips) and galloping is good at both.
+- **The fallback is explicit.** Required, excluded and phrase clauses take the
+  exhaustive path, because they constrain the candidate set more aggressively
+  than pruning would. `Searcher::with_pruning(false)` forces that path for any
+  query, which is what lets the benchmark compare the two over an identical
+  candidate set.
+
+Equivalence is a test, not a claim: for a range of queries and `k` values, the
+pruned ranking is compared document by document against exhaustive scoring.
+
+### 6. Snippets re-analyze the document
 
 The alternative would be storing per-term offsets in the index, growing the
 index to benefit only the ten documents actually displayed. Re-analyzing costs
@@ -76,7 +106,7 @@ The window is picked by number of **distinct** terms, not by total occurrences:
 a window repeating the same word ten times explains the match less than one
 showing three different query words.
 
-### 6. Parallel indexing without losing reproducibility
+### 7. Parallel indexing without losing reproducibility
 
 Analyzing text is CPU work over independent inputs — the ideal case for data
 parallelism. Files are split into chunks, each chunk builds its own index, and
@@ -86,7 +116,7 @@ Order matters: paths are sorted before the split and shards are merged in that
 order, so document ids are identical to a sequential run. Without that, score
 ties would break differently on every run and no output test would be stable.
 
-### 7. The index file describes itself
+### 8. The index file describes itself
 
 Magic bytes and a format version sit in front of the payload. The former tell
 "this is not an index" apart from "this index is corrupt"; the latter turns a
@@ -99,7 +129,7 @@ The analyzer is **not** serialised. A stopword list is configuration, not data:
 freezing it into the file would make it impossible to change without reindexing
 everything.
 
-### 8. An unreadable file aborts indexing
+### 9. An unreadable file aborts indexing
 
 The opposite — skip and carry on — would produce a silently incomplete index. A
 search engine that lies about its coverage is worse than one that refuses to
@@ -111,7 +141,9 @@ start.
 |-----------|------|
 | Index one document | O(t), t = number of terms |
 | Merge one shard | O(p), p = postings in the shard |
-| Term query | O(df) to collect + O(k) for the output ranking |
+| Term query, exhaustive | O(df) to collect + O(k) for the ranking |
+| Term query, pruned | O(scored × terms × log df) — `scored ≪ df` in practice |
+| Skip to a document | O(log distance) — galloping then binary search |
 | Intersection of n required terms | O(Σ df) with hash sets |
 | Phrase of n terms | O(df_rarest × n × log(tf)) — binary search per position |
 | Snippet | O(t) per displayed document |
@@ -123,7 +155,8 @@ start.
   measure against, it would be speculative optimisation.
 - **Incremental updates**: require immutable segments with background merging,
   tombstones for deletion and a commit manager. That is another project.
-- **WAND / block-max**: only pays off when `k ≪ number of candidates`, a regime
-  this corpus never reaches.
+- **Block-max WAND**: refines the bounds per block of postings instead of per
+  term, which prunes harder. It needs the compressed block layout above to be
+  worth it, so the two go together or not at all.
 - **Prefix search and typo tolerance**: need a different structure (an FST or a
   Levenshtein automaton) alongside the inverted index.

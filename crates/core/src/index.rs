@@ -50,6 +50,42 @@ impl Posting {
     }
 }
 
+/// A term's posting list plus the statistics needed to bound its score.
+///
+/// `max_tf` and `min_len` are the extremes observed across the postings. They
+/// give an upper bound on what this term can contribute to *any* document:
+/// BM25 grows with term frequency and shrinks with document length, so the best
+/// case is the highest frequency in the shortest document. The bound holds for
+/// every `k1`/`b`, which is why it can be computed once at index time and reused
+/// by queries that tune the ranking at runtime.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TermIndex {
+    postings: Vec<Posting>,
+    max_tf: u32,
+    min_len: u32,
+}
+
+impl TermIndex {
+    pub fn postings(&self) -> &[Posting] {
+        &self.postings
+    }
+
+    /// Number of documents containing the term.
+    pub fn doc_freq(&self) -> u32 {
+        self.postings.len() as u32
+    }
+
+    /// Highest term frequency observed for this term.
+    pub fn max_tf(&self) -> u32 {
+        self.max_tf
+    }
+
+    /// Length of the shortest document containing the term.
+    pub fn min_len(&self) -> u32 {
+        self.min_len
+    }
+}
+
 /// An in-memory inverted index.
 ///
 /// # Example
@@ -65,7 +101,7 @@ impl Posting {
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Index {
-    postings: HashMap<String, Vec<Posting>>,
+    postings: HashMap<String, TermIndex>,
     docs: Vec<Document>,
     total_length: u64,
     #[serde(skip)]
@@ -118,6 +154,7 @@ impl Index {
             self.postings
                 .entry(term.to_string())
                 .or_default()
+                .postings
                 .push(Posting { doc: id, positions });
         }
 
@@ -139,12 +176,14 @@ impl Index {
     /// independent shard and the shards are folded together at the end.
     pub fn merge(&mut self, other: Index) {
         let offset = self.docs.len() as DocId;
-        for (term, postings) in other.postings {
+        for (term, term_index) in other.postings {
             let entry = self.postings.entry(term).or_default();
-            entry.extend(postings.into_iter().map(|mut p| {
-                p.doc += offset;
-                p
-            }));
+            entry
+                .postings
+                .extend(term_index.postings.into_iter().map(|mut p| {
+                    p.doc += offset;
+                    p
+                }));
         }
         for mut doc in other.docs {
             doc.id += offset;
@@ -153,24 +192,43 @@ impl Index {
         self.total_length += other.total_length;
     }
 
-    /// Sorts every posting list by document id.
+    /// Sorts every posting list and refreshes the per-term score bounds.
     ///
-    /// Callers must run this after [`merge`](Index::merge); intersection and
-    /// phrase matching assume ascending order.
+    /// Callers must run this after [`merge`](Index::merge): intersection and
+    /// phrase matching assume ascending document ids, and dynamic pruning
+    /// assumes the bounds describe the postings as they currently are.
     pub fn finish(&mut self) {
-        for postings in self.postings.values_mut() {
-            postings.sort_unstable_by_key(|p| p.doc);
+        for term_index in self.postings.values_mut() {
+            term_index.postings.sort_unstable_by_key(|p| p.doc);
+            term_index.max_tf = term_index
+                .postings
+                .iter()
+                .map(Posting::tf)
+                .max()
+                .unwrap_or(0);
+            term_index.min_len = term_index
+                .postings
+                .iter()
+                .filter_map(|p| self.docs.get(p.doc as usize))
+                .map(|doc| doc.length)
+                .min()
+                .unwrap_or(0);
         }
     }
 
     /// Posting list for an already analyzed `term`, or `None` if unseen.
     pub fn postings(&self, term: &str) -> Option<&[Posting]> {
-        self.postings.get(term).map(Vec::as_slice)
+        self.postings.get(term).map(TermIndex::postings)
+    }
+
+    /// Posting list and score bounds for an already analyzed `term`.
+    pub fn term(&self, term: &str) -> Option<&TermIndex> {
+        self.postings.get(term)
     }
 
     /// Number of documents containing `term` — the BM25 document frequency.
     pub fn doc_freq(&self, term: &str) -> u32 {
-        self.postings.get(term).map_or(0, |p| p.len() as u32)
+        self.postings.get(term).map_or(0, TermIndex::doc_freq)
     }
 
     /// Looks up document metadata by id.
@@ -207,7 +265,7 @@ impl Index {
 
     /// Total number of postings, i.e. the size of the index in entries.
     pub fn total_postings(&self) -> usize {
-        self.postings.values().map(Vec::len).sum()
+        self.postings.values().map(|t| t.postings.len()).sum()
     }
 }
 
@@ -246,6 +304,34 @@ mod tests {
         assert_eq!(index.documents()[0].length, 6);
         assert_eq!(index.documents()[1].length, 4);
         assert_eq!(index.avg_doc_len(), 5.0);
+    }
+
+    #[test]
+    fn finish_records_the_score_bounds_of_every_term() {
+        let mut index = Index::new(Analyzer::raw());
+        index.add("a", "A", "rust rust rust padding padding padding");
+        index.add("b", "B", "rust");
+        index.finish();
+
+        let term = index.term("rust").unwrap();
+        assert_eq!(term.max_tf(), 3, "highest frequency across postings");
+        assert_eq!(term.min_len(), 1, "shortest document containing the term");
+    }
+
+    #[test]
+    fn score_bounds_are_refreshed_after_a_merge() {
+        let mut left = Index::new(Analyzer::raw());
+        left.add("a", "A", "rust padding padding");
+        left.finish();
+        assert_eq!(left.term("rust").unwrap().max_tf(), 1);
+
+        let mut right = Index::new(Analyzer::raw());
+        right.add("b", "B", "rust rust");
+        left.merge(right);
+        left.finish();
+
+        assert_eq!(left.term("rust").unwrap().max_tf(), 2);
+        assert_eq!(left.term("rust").unwrap().min_len(), 2);
     }
 
     #[test]

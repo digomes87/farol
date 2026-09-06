@@ -25,9 +25,13 @@ use crate::error::{Error, Result};
 use crate::index::Index;
 
 /// Bumped whenever the serialised layout stops being backward compatible.
-pub const FORMAT_VERSION: u32 = 1;
+pub const FORMAT_VERSION: u32 = 2;
 
 const MAGIC: [u8; 6] = *b"FAROL1";
+
+// Version history:
+//   1 - postings and documents
+//   2 - per-term score bounds (max_tf, min_len) used by dynamic pruning
 
 #[derive(Serialize, Deserialize)]
 struct Envelope {

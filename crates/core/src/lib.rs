@@ -8,6 +8,8 @@
 //! | [`index`] | terms → posting lists (the inverted index) |
 //! | [`bm25`] | posting lists → relevance scores |
 //! | [`query`] | query string → boolean clauses |
+//! | [`cursor`] | skip-capable iteration over a posting list |
+//! | [`topk`] | bounded collector for the best k hits |
 //! | [`searcher`] | clauses + index → ranked hits |
 //! | [`snippet`] | matched document → highlighted excerpt |
 //! | [`store`] | index ↔ a single self-describing file |
@@ -16,6 +18,7 @@
 
 pub mod analyzer;
 pub mod bm25;
+pub mod cursor;
 pub mod engine;
 pub mod error;
 pub mod index;
@@ -23,6 +26,7 @@ pub mod query;
 pub mod searcher;
 pub mod snippet;
 pub mod store;
+pub mod topk;
 
 pub use analyzer::{Analyzer, Token};
 pub use bm25::Bm25;
@@ -30,5 +34,5 @@ pub use engine::{Engine, SearchResult, Stats};
 pub use error::{Error, Result};
 pub use index::{DocId, Document, Index, Posting};
 pub use query::{Clause, ClauseKind, Occur, Query};
-pub use searcher::{Hit, Searcher};
+pub use searcher::{Hit, SearchStats, Searcher, Strategy};
 pub use snippet::{Highlighter, Snippet};

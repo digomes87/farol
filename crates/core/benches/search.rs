@@ -7,7 +7,7 @@
 //! the cost the query planner is designed to avoid.
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
-use farol_core::{Analyzer, Index, Query, Searcher};
+use farol_core::{Analyzer, Index, Query, Searcher, Strategy};
 
 const DOCS: usize = 5_000;
 const TERMS_PER_DOC: usize = 120;
@@ -87,5 +87,38 @@ fn querying(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, indexing, querying);
+/// Same queries, same candidate set, both evaluation strategies — so the
+/// difference measured is the pruning itself and not a different query shape.
+fn pruning(c: &mut Criterion) {
+    let index = build(&corpus());
+    let analyzer = Analyzer::raw();
+    let wand = Searcher::new(&index);
+    let exhaustive = Searcher::new(&index).with_pruning(false);
+
+    let mut group = c.benchmark_group("pruning");
+    for input in ["term0 term1", "term0 term1 term2 term3"] {
+        let query = Query::parse(input, &analyzer).expect("valid query");
+
+        // The numbers only mean something if the strategies really differ.
+        let (top_wand, wand_stats) = wand.search_with_stats(&query, 10);
+        let (top_plain, plain_stats) = exhaustive.search_with_stats(&query, 10);
+        assert_eq!(wand_stats.strategy, Strategy::Wand);
+        assert_eq!(plain_stats.strategy, Strategy::Exhaustive);
+        assert_eq!(
+            top_wand.iter().map(|h| h.doc).collect::<Vec<_>>(),
+            top_plain.iter().map(|h| h.doc).collect::<Vec<_>>(),
+            "the two strategies disagree on `{input}`"
+        );
+
+        group.bench_function(format!("wand / {input}"), |b| {
+            b.iter(|| black_box(wand.search(&query, 10)))
+        });
+        group.bench_function(format!("exhaustive / {input}"), |b| {
+            b.iter(|| black_box(exhaustive.search(&query, 10)))
+        });
+    }
+    group.finish();
+}
+
+criterion_group!(benches, indexing, querying, pruning);
 criterion_main!(benches);

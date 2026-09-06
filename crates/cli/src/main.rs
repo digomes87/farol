@@ -66,6 +66,9 @@ enum Command {
         /// Prints JSON instead of text.
         #[arg(long)]
         json: bool,
+        /// Reports which evaluation strategy ran and how much work it avoided.
+        #[arg(long)]
+        explain: bool,
     },
     /// Interactive session: loads the index once and answers many queries.
     Repl {
@@ -118,7 +121,8 @@ fn main() -> Result<()> {
             ranking,
             limit,
             json,
-        } => search(query.join(" "), index.file, ranking, limit, json),
+            explain,
+        } => search(query.join(" "), index.file, ranking, limit, json, explain),
         Command::Repl {
             index,
             ranking,
@@ -196,17 +200,24 @@ fn search(
     ranking: Ranking,
     limit: usize,
     json: bool,
+    explain: bool,
 ) -> Result<()> {
     let style = Style::detect(if json { Some(false) } else { None });
     let engine = open(&index_path, ranking, &style)?;
 
     let started = Instant::now();
-    let results = engine.search(&query, limit)?;
+    let (results, stats) = engine.search_with_stats(&query, limit)?;
     let elapsed = started.elapsed().as_secs_f64() * 1_000.0;
 
     if json {
-        println!("{}", render::results_json(&results, &query, elapsed));
+        println!(
+            "{}",
+            render::results_json(&results, &query, elapsed, &stats)
+        );
     } else {
+        if explain {
+            print!("{}", render::explain(&stats, &style));
+        }
         print!("{}", render::results(&results, &query, elapsed, &style));
     }
     Ok(())

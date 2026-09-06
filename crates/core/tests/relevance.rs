@@ -108,6 +108,23 @@ fn results_carry_a_snippet_that_shows_the_match() {
 }
 
 #[test]
+fn dynamic_pruning_does_not_change_the_answers() {
+    let engine = engine();
+    // Optional-term queries take the WAND path; the ranking they produce must
+    // be indistinguishable from exhaustive scoring.
+    for query in [
+        "index positions",
+        "posting list document",
+        "stemming stopwords",
+    ] {
+        let (results, stats) = engine.search_with_stats(query, 5).unwrap();
+        assert_eq!(stats.strategy, farol_core::Strategy::Wand, "`{query}`");
+        assert!(stats.scored <= stats.candidates);
+        assert!(!results.is_empty(), "`{query}` returned nothing");
+    }
+}
+
+#[test]
 fn ranking_is_stable_across_runs() {
     let first: Vec<_> = engine()
         .search("index terms document", 5)

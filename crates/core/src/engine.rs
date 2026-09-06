@@ -22,7 +22,7 @@ use crate::bm25::Bm25;
 use crate::error::{Error, Result};
 use crate::index::Index;
 use crate::query::Query;
-use crate::searcher::Searcher;
+use crate::searcher::{SearchStats, Searcher};
 use crate::snippet::Highlighter;
 use crate::store;
 
@@ -153,13 +153,23 @@ impl Engine {
 
     /// Parses and runs `input`, returning at most `limit` results.
     pub fn search(&self, input: &str, limit: usize) -> Result<Vec<SearchResult>> {
+        self.search_with_stats(input, limit).map(|(hits, _)| hits)
+    }
+
+    /// Same as [`search`](Engine::search), also reporting how the query was
+    /// evaluated — which strategy ran, and how many documents it had to score.
+    pub fn search_with_stats(
+        &self,
+        input: &str,
+        limit: usize,
+    ) -> Result<(Vec<SearchResult>, SearchStats)> {
         let query = Query::parse(input, self.index.analyzer())?;
         let terms = query.positive_terms();
-        let hits = Searcher::new(&self.index)
+        let (hits, stats) = Searcher::new(&self.index)
             .with_bm25(self.bm25)
-            .search(&query, limit);
+            .search_with_stats(&query, limit);
 
-        Ok(hits
+        let results = hits
             .into_iter()
             .filter_map(|hit| {
                 let doc = self.index.document(hit.doc)?;
@@ -173,7 +183,8 @@ impl Engine {
                         .text,
                 })
             })
-            .collect())
+            .collect();
+        Ok((results, stats))
     }
 
     /// Counters describing the current index.
@@ -355,6 +366,19 @@ mod tests {
         let mut engine = Engine::default();
         engine.index_dir(dir.path()).unwrap();
         assert_eq!(engine.search("collector", 5).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn search_reports_the_strategy_it_used() {
+        let dir = corpus();
+        let mut engine = Engine::default();
+        engine.index_dir(dir.path()).unwrap();
+
+        let (_, optional) = engine.search_with_stats("garbage collector", 5).unwrap();
+        assert_eq!(optional.strategy, crate::searcher::Strategy::Wand);
+
+        let (_, required) = engine.search_with_stats("+garbage collector", 5).unwrap();
+        assert_eq!(required.strategy, crate::searcher::Strategy::Exhaustive);
     }
 
     #[test]
