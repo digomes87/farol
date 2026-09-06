@@ -15,6 +15,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use rayon::prelude::*;
+
 use crate::analyzer::Analyzer;
 use crate::bm25::Bm25;
 use crate::error::{Error, Result};
@@ -26,6 +28,13 @@ use crate::store;
 
 /// File extensions crawled by [`Engine::index_dir`] unless overridden.
 pub const DEFAULT_EXTENSIONS: &[&str] = &["txt", "md", "markdown", "rst", "text"];
+
+/// Files handed to each parallel worker.
+///
+/// Large enough that the per-shard `HashMap` is amortised over several
+/// documents, small enough that a directory of a few dozen files still uses
+/// every core.
+const INDEX_CHUNK: usize = 16;
 
 /// A search result, ready to be displayed.
 #[derive(Debug, Clone)]
@@ -109,19 +118,37 @@ impl Engine {
     /// silently skipping them would produce an index that is quietly missing
     /// documents, and a search engine that lies about its coverage is worse
     /// than one that refuses to start.
+    ///
+    /// Files are read and analyzed in parallel. Analysis is pure CPU work over
+    /// independent inputs, so the crawl is split into chunks, each chunk builds
+    /// a private index shard, and the shards are merged in path order — which
+    /// keeps document ids identical to a sequential run no matter how the work
+    /// was scheduled.
     pub fn index_dir(&mut self, root: impl AsRef<Path>) -> Result<usize> {
         let files = self.collect_files(root.as_ref())?;
-        let added = files.len();
-        for path in files {
-            let text = fs::read_to_string(&path).map_err(|source| Error::Io {
-                path: path.clone(),
-                source,
-            })?;
-            let title = title_of(&path, &text);
-            self.index.add(path.display().to_string(), title, &text);
+        let analyzer = self.index.analyzer().clone();
+
+        let shards: Vec<Index> = files
+            .par_chunks(INDEX_CHUNK)
+            .map(|chunk| {
+                let mut shard = Index::new(analyzer.clone());
+                for path in chunk {
+                    let text = fs::read_to_string(path).map_err(|source| Error::Io {
+                        path: path.clone(),
+                        source,
+                    })?;
+                    let title = title_of(path, &text);
+                    shard.add(path.display().to_string(), title, &text);
+                }
+                Ok(shard)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        for shard in shards {
+            self.index.merge(shard);
         }
         self.index.finish();
-        Ok(added)
+        Ok(files.len())
     }
 
     /// Parses and runs `input`, returning at most `limit` results.
@@ -260,6 +287,32 @@ mod tests {
         fs::create_dir(dir.path().join(".git")).unwrap();
         fs::write(dir.path().join(".git/HEAD.txt"), "ref: refs/heads/main").unwrap();
         dir
+    }
+
+    #[test]
+    fn parallel_indexing_produces_the_same_ids_as_a_sequential_run() {
+        let dir = tempfile::tempdir().unwrap();
+        for i in 0..200 {
+            fs::write(
+                dir.path().join(format!("doc-{i:03}.txt")),
+                format!("document number {i} about rust and search"),
+            )
+            .unwrap();
+        }
+
+        let mut engine = Engine::default();
+        engine.index_dir(dir.path()).unwrap();
+
+        let uris: Vec<_> = engine
+            .index()
+            .documents()
+            .iter()
+            .map(|d| d.uri.clone())
+            .collect();
+        let mut sorted = uris.clone();
+        sorted.sort();
+        assert_eq!(uris, sorted, "document ids must follow path order");
+        assert_eq!(engine.stats().documents, 200);
     }
 
     #[test]
