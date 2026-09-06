@@ -467,7 +467,7 @@ mod tests {
         Searcher::new(&index)
             .search(&query, limit)
             .into_iter()
-            .map(|hit| (index.document(hit.doc).unwrap().uri.clone(), hit.score))
+            .map(|hit| (index.document(hit.doc).unwrap().uri.to_string(), hit.score))
             .collect()
     }
 

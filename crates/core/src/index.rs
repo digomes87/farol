@@ -12,6 +12,7 @@
 //! Positions are kept per posting because phrase queries need adjacency, and
 //! document lengths are kept because BM25 penalises long documents.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -79,6 +80,91 @@ pub struct BlockMeta {
     pub min_len: u32,
 }
 
+/// A borrowed view of one term's posting list.
+///
+/// The blocks are a [`Cow`] on purpose: an in-memory index hands out a slice of
+/// what it already holds, while a memory-mapped one parses the block table out
+/// of the mapped bytes and owns that small vector. Everything downstream — the
+/// cursor, the pruning loop — works the same either way and never learns which
+/// kind of index it is reading.
+#[derive(Debug, Clone)]
+pub struct TermRef<'a> {
+    blocks: Cow<'a, [BlockMeta]>,
+    data: &'a [u8],
+    doc_freq: u32,
+    max_tf: u32,
+    min_len: u32,
+}
+
+impl<'a> TermRef<'a> {
+    pub fn new(
+        blocks: Cow<'a, [BlockMeta]>,
+        data: &'a [u8],
+        doc_freq: u32,
+        max_tf: u32,
+        min_len: u32,
+    ) -> Self {
+        Self {
+            blocks,
+            data,
+            doc_freq,
+            max_tf,
+            min_len,
+        }
+    }
+
+    pub fn doc_freq(&self) -> u32 {
+        self.doc_freq
+    }
+
+    pub fn max_tf(&self) -> u32 {
+        self.max_tf
+    }
+
+    pub fn min_len(&self) -> u32 {
+        self.min_len
+    }
+
+    pub fn blocks(&self) -> &[BlockMeta] {
+        &self.blocks
+    }
+
+    pub fn data(&self) -> &[u8] {
+        self.data
+    }
+
+    /// Decodes one block.
+    pub fn decode_block(&self, block: usize) -> Vec<Posting> {
+        let Some(meta) = self.blocks.get(block) else {
+            return Vec::new();
+        };
+        let start = meta.offset as usize;
+        if start > self.data.len() {
+            return Vec::new();
+        }
+        decode_block(&self.data[start..], meta.count as usize)
+    }
+
+    /// Decodes the whole posting list.
+    pub fn decode_all(&self) -> Vec<Posting> {
+        let mut out = Vec::with_capacity(self.doc_freq as usize);
+        for block in 0..self.blocks.len() {
+            out.append(&mut self.decode_block(block));
+        }
+        out
+    }
+}
+
+/// A borrowed view of one indexed document.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DocumentRef<'a> {
+    pub id: DocId,
+    pub uri: &'a str,
+    pub title: &'a str,
+    pub text: &'a str,
+    pub length: u32,
+}
+
 /// A term's compressed posting list, sliced into blocks.
 ///
 /// Postings are staged uncompressed while documents are being added and encoded
@@ -128,12 +214,15 @@ impl TermIndex {
         self.data.len()
     }
 
-    /// Decodes one block.
-    pub fn decode_block(&self, block: usize) -> Vec<Posting> {
-        let Some(meta) = self.blocks.get(block) else {
-            return Vec::new();
-        };
-        decode_block(&self.data[meta.offset as usize..], meta.count as usize)
+    /// Borrowed view of this posting list.
+    pub fn as_ref(&self) -> TermRef<'_> {
+        TermRef::new(
+            Cow::Borrowed(&self.blocks),
+            &self.data,
+            self.doc_freq,
+            self.max_tf,
+            self.min_len,
+        )
     }
 
     /// Decodes the whole posting list.
@@ -142,11 +231,7 @@ impl TermIndex {
     /// matching and exhaustive scoring — and deliberately *not* what dynamic
     /// pruning uses, since the point there is to skip most blocks.
     pub fn decode_all(&self) -> Vec<Posting> {
-        let mut out = Vec::with_capacity(self.doc_freq as usize);
-        for block in 0..self.blocks.len() {
-            out.append(&mut self.decode_block(block));
-        }
-        out
+        self.as_ref().decode_all()
     }
 
     /// Appends a posting to the staging area.
@@ -365,8 +450,8 @@ impl Index {
     }
 
     /// Posting list and score bounds for an already analyzed `term`.
-    pub fn term(&self, term: &str) -> Option<&TermIndex> {
-        self.postings.get(term)
+    pub fn term(&self, term: &str) -> Option<TermRef<'_>> {
+        self.postings.get(term).map(TermIndex::as_ref)
     }
 
     /// Number of documents containing `term` — the BM25 document frequency.
@@ -375,8 +460,14 @@ impl Index {
     }
 
     /// Looks up document metadata by id.
-    pub fn document(&self, id: DocId) -> Option<&Document> {
-        self.docs.get(id as usize)
+    pub fn document(&self, id: DocId) -> Option<DocumentRef<'_>> {
+        self.docs.get(id as usize).map(|doc| DocumentRef {
+            id: doc.id,
+            uri: &doc.uri,
+            title: &doc.title,
+            text: &doc.text,
+            length: doc.length,
+        })
     }
 
     /// All indexed documents, in insertion order.

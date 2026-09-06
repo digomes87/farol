@@ -19,12 +19,12 @@
 //! (long skips) with frequent ones (short skips), and galloping is good at both.
 
 use crate::bm25::Bm25;
-use crate::index::{DocId, Posting, TermIndex};
+use crate::index::{DocId, Posting, TermRef};
 
 /// A position inside one term's compressed posting list.
 #[derive(Debug, Clone)]
 pub struct BlockCursor<'a> {
-    term: &'a TermIndex,
+    term: TermRef<'a>,
     /// Index of the block currently decoded.
     block: usize,
     /// Postings of that block. Only one block is ever decoded at a time.
@@ -38,7 +38,7 @@ pub struct BlockCursor<'a> {
 
 impl<'a> BlockCursor<'a> {
     /// Creates a cursor on the first posting of `term`.
-    pub fn new(term: &'a TermIndex, idf: f32, bm25: Bm25, avg_doc_len: f32) -> Self {
+    pub fn new(term: TermRef<'a>, idf: f32, bm25: Bm25, avg_doc_len: f32) -> Self {
         let mut cursor = Self {
             term,
             block: 0,

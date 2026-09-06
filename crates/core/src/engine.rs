@@ -176,12 +176,12 @@ impl Engine {
             .filter_map(|hit| {
                 let doc = self.index.document(hit.doc)?;
                 Some(SearchResult {
-                    uri: doc.uri.clone(),
-                    title: doc.title.clone(),
+                    uri: doc.uri.to_string(),
+                    title: doc.title.to_string(),
                     score: hit.score,
                     snippet: self
                         .highlighter
-                        .snippet(&doc.text, self.index.analyzer(), &terms)
+                        .snippet(doc.text, self.index.analyzer(), &terms)
                         .text,
                 })
             })
