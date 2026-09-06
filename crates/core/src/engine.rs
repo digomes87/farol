@@ -90,6 +90,20 @@ impl Engine {
         }
     }
 
+    /// A new, empty engine with the same analysis and ranking configuration.
+    ///
+    /// This is what a rebuild starts from: the index is replaced, everything
+    /// that decides how text is analyzed and how results are ranked is carried
+    /// over, so a rebuilt generation answers like the one it succeeds.
+    pub fn fork_config(&self) -> Self {
+        Self {
+            index: IndexSource::from(Index::new(self.index.analyzer().clone()).seal()),
+            bm25: self.bm25,
+            highlighter: self.highlighter.clone(),
+            extensions: self.extensions.clone(),
+        }
+    }
+
     /// Overrides the BM25 parameters used for ranking.
     pub fn with_bm25(mut self, bm25: Bm25) -> Self {
         self.bm25 = bm25;

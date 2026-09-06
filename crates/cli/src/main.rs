@@ -11,11 +11,12 @@ mod render;
 
 use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
-use std::time::Instant;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
-use farol_core::{Analyzer, Bm25, Engine, Highlighter};
+use farol_core::{Analyzer, Bm25, Engine, Highlighter, SearchService};
 
 use crate::render::Style;
 
@@ -97,6 +98,13 @@ enum Command {
         ranking: Ranking,
         #[arg(short = 'n', long, default_value_t = 5)]
         limit: usize,
+        /// Rebuilds the index from this directory in the background, without
+        /// interrupting the session.
+        #[arg(long, value_name = "DIR")]
+        watch: Option<PathBuf>,
+        /// Seconds between background rebuilds.
+        #[arg(long, default_value_t = 10, value_name = "SECONDS")]
+        every: u64,
     },
     /// Shows the index counters.
     Stats {
@@ -154,7 +162,9 @@ fn main() -> Result<()> {
             index,
             ranking,
             limit,
-        } => repl(index.file, ranking, limit),
+            watch,
+            every,
+        } => repl(index.file, ranking, limit, watch, every),
         Command::Stats { index } => stats(index.file),
     }
 }
@@ -252,19 +262,49 @@ fn search(
     Ok(())
 }
 
-fn repl(index_path: PathBuf, ranking: Ranking, limit: usize) -> Result<()> {
+fn repl(
+    index_path: PathBuf,
+    ranking: Ranking,
+    limit: usize,
+    watch: Option<PathBuf>,
+    every: u64,
+) -> Result<()> {
     let style = Style::detect(None);
-    let engine = open(&index_path, ranking, &style)?;
+    let service = Arc::new(SearchService::new(open(&index_path, ranking, &style)?));
+
     emit(&format!(
         "{}\n{}\n",
         style.bold("farol repl"),
         style.dim("type a query, or Ctrl-D to quit")
     ))?;
 
+    // The rebuild runs on its own thread and publishes when it is done. The
+    // loop below never waits for it: queries are answered from whichever
+    // generation is current when they arrive.
+    if let Some(root) = watch {
+        emit(&format!(
+            "{}\n",
+            style.dim(&format!(
+                "watching {} — rebuilding every {every}s",
+                root.display()
+            ))
+        ))?;
+        let service = Arc::clone(&service);
+        std::thread::spawn(move || loop {
+            std::thread::sleep(Duration::from_secs(every.max(1)));
+            // A failed rebuild leaves the current generation serving; there is
+            // nothing to roll back, because nothing was replaced.
+            let _ = service.reindex(&root);
+        });
+    }
+
     let stdin = io::stdin();
     let mut lines = stdin.lock().lines();
     loop {
-        print!("{} ", style.cyan("›"));
+        emit(&format!(
+            "{} ",
+            style.cyan(&format!("[gen {}] ›", service.generation()))
+        ))?;
         io::stdout().flush()?;
         let Some(line) = lines.next().transpose()? else {
             break;
@@ -276,7 +316,7 @@ fn repl(index_path: PathBuf, ranking: Ranking, limit: usize) -> Result<()> {
 
         let started = Instant::now();
         // A malformed query must not end the session — report and keep going.
-        match engine.search(query, limit) {
+        match service.search(query, limit) {
             Ok(results) => {
                 let elapsed = started.elapsed().as_secs_f64() * 1_000.0;
                 emit(&render::results(&results, query, elapsed, &style))?;

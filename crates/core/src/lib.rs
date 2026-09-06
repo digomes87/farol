@@ -16,6 +16,7 @@
 //! | [`store`] | index ↔ a single self-describing file |
 //! | [`mmap`] | index ↔ a file read in place, without loading it |
 //! | [`snapshot`] | lock-free publication of a new index to live readers |
+//! | [`service`] | a search engine that can be rebuilt while it serves |
 //! | [`source`] | one interface over in-memory and mapped indexes |
 //! | [`engine`] | the façade tying every stage together |
 //! | [`error`] | the crate wide error type |
@@ -30,6 +31,7 @@ pub mod index;
 pub mod mmap;
 pub mod query;
 pub mod searcher;
+pub mod service;
 pub mod snapshot;
 pub mod snippet;
 pub mod source;
@@ -44,5 +46,7 @@ pub use index::{DocId, Document, Index, Posting};
 pub use mmap::MappedIndex;
 pub use query::{Clause, ClauseKind, Occur, Query};
 pub use searcher::{Hit, SearchStats, Searcher, Strategy};
+pub use service::{Generation, SearchService};
+pub use snapshot::SnapshotCell;
 pub use snippet::{Highlighter, Snippet};
 pub use source::{Edit, IndexSource};
