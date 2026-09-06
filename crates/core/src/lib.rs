@@ -11,10 +11,12 @@
 //! | [`searcher`] | clauses + index → ranked hits |
 //! | [`snippet`] | matched document → highlighted excerpt |
 //! | [`store`] | index ↔ a single self-describing file |
+//! | [`engine`] | the façade tying every stage together |
 //! | [`error`] | the crate wide error type |
 
 pub mod analyzer;
 pub mod bm25;
+pub mod engine;
 pub mod error;
 pub mod index;
 pub mod query;
@@ -24,6 +26,7 @@ pub mod store;
 
 pub use analyzer::{Analyzer, Token};
 pub use bm25::Bm25;
+pub use engine::{Engine, SearchResult, Stats};
 pub use error::{Error, Result};
 pub use index::{DocId, Document, Index, Posting};
 pub use query::{Clause, ClauseKind, Occur, Query};
