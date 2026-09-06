@@ -10,6 +10,7 @@
 //! | [`query`] | query string → boolean clauses |
 //! | [`searcher`] | clauses + index → ranked hits |
 //! | [`snippet`] | matched document → highlighted excerpt |
+//! | [`store`] | index ↔ a single self-describing file |
 //! | [`error`] | the crate wide error type |
 
 pub mod analyzer;
@@ -19,6 +20,7 @@ pub mod index;
 pub mod query;
 pub mod searcher;
 pub mod snippet;
+pub mod store;
 
 pub use analyzer::{Analyzer, Token};
 pub use bm25::Bm25;

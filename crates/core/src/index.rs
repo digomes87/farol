@@ -94,6 +94,12 @@ impl Index {
         self.analyzer.as_ref().expect("analyzer is always set")
     }
 
+    /// Rebinds an analyzer after deserialization, which cannot carry the
+    /// stopword configuration (see [`crate::store`]).
+    pub(crate) fn set_analyzer(&mut self, analyzer: Analyzer) {
+        self.analyzer = Some(analyzer);
+    }
+
     /// Analyzes `text` and adds it as a new document, returning its id.
     pub fn add(&mut self, uri: impl Into<String>, title: impl Into<String>, text: &str) -> DocId {
         let tokens = self.analyzer().analyze(text);
