@@ -67,13 +67,27 @@ use std::fmt;
 #[cfg(loom)]
 use loom::sync::{
     atomic::{AtomicPtr, Ordering},
-    Arc, Mutex, RwLock,
+    Mutex, RwLock,
 };
 #[cfg(not(loom))]
 use std::sync::{
     atomic::{AtomicPtr, Ordering},
-    Arc, Mutex, RwLock,
+    Mutex, RwLock,
 };
+
+/// The reference-counted pointer this module hands out.
+///
+/// Normally `std::sync::Arc`; under `--cfg loom` it is loom's instrumented
+/// equivalent, so the model checker can see every reference-count operation.
+/// Callers name the alias rather than `Arc` directly — otherwise a loom build
+/// ends up with two incompatible `Arc` types meeting at a function signature,
+/// which is a compile error rather than anything subtle, but a confusing one.
+#[cfg(loom)]
+pub use loom::sync::Arc as Shared;
+#[cfg(not(loom))]
+pub use std::sync::Arc as Shared;
+
+use Shared as Arc;
 
 /// A cell holding an `Arc<T>` that can be replaced while others read it.
 pub struct SnapshotCell<T> {

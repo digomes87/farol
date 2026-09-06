@@ -19,13 +19,13 @@
 //! still reading it, and not one moment longer.
 
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use crate::analyzer::Analyzer;
 use crate::engine::{Engine, SearchResult, Stats};
 use crate::error::{Error, Result};
 use crate::searcher::SearchStats;
-use crate::snapshot::SnapshotCell;
+use crate::snapshot::{Shared, SnapshotCell};
 
 /// One published version of the index, and the number identifying it.
 ///
@@ -59,9 +59,9 @@ impl SearchService {
 
     /// The generation currently being served.
     ///
-    /// Holding the returned `Arc` pins that version: it keeps answering
+    /// Holding the returned handle pins that version: it keeps answering
     /// consistently even after newer ones are published.
-    pub fn snapshot(&self) -> Arc<Generation> {
+    pub fn snapshot(&self) -> Shared<Generation> {
         self.current.load()
     }
 
@@ -160,11 +160,16 @@ impl SearchService {
     }
 }
 
-#[cfg(test)]
+// Under `--cfg loom` the snapshot cell is built on loom's primitives, which
+// panic outside a `loom::model` block. These tests drive it from ordinary
+// threads, so they are compiled out of loom builds; the model checking lives in
+// `snapshot::loom_tests`.
+#[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
     use std::fs;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::Arc;
     use std::thread;
 
     fn corpus(dir: &Path, docs: &[(&str, &str)]) {

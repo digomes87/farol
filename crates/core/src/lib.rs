@@ -47,6 +47,6 @@ pub use mmap::MappedIndex;
 pub use query::{Clause, ClauseKind, Occur, Query};
 pub use searcher::{Hit, SearchStats, Searcher, Strategy};
 pub use service::{Generation, SearchService};
-pub use snapshot::SnapshotCell;
+pub use snapshot::{Shared, SnapshotCell};
 pub use snippet::{Highlighter, Snippet};
 pub use source::{Edit, IndexSource};
