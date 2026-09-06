@@ -168,8 +168,8 @@ impl SearchService {
 mod tests {
     use super::*;
     use std::fs;
-    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Barrier};
     use std::thread;
 
     fn corpus(dir: &Path, docs: &[(&str, &str)]) {
@@ -246,47 +246,53 @@ mod tests {
 
     #[test]
     fn queries_keep_being_answered_while_the_index_is_rebuilt() {
+        // Each reader runs a fixed number of queries and the rebuild loop keeps
+        // going until they are done, so the overlap is structural rather than a
+        // race the test hopes to win on a busy machine.
+        const READERS: usize = 4;
+        const QUERIES_EACH: usize = 50;
+
         let dir = tempfile::tempdir().unwrap();
         corpus(dir.path(), &[("a.md", "rust is a systems language")]);
         let service = Arc::new(service_over(dir.path()));
-        let stop = Arc::new(AtomicBool::new(false));
-        let answered = Arc::new(AtomicU64::new(0));
+        let start = Arc::new(Barrier::new(READERS + 1));
+        let finished = Arc::new(AtomicUsize::new(0));
 
-        let readers: Vec<_> = (0..4)
+        let readers: Vec<_> = (0..READERS)
             .map(|_| {
                 let service = Arc::clone(&service);
-                let stop = Arc::clone(&stop);
-                let answered = Arc::clone(&answered);
+                let start = Arc::clone(&start);
+                let finished = Arc::clone(&finished);
                 thread::spawn(move || {
-                    while !stop.load(Ordering::Relaxed) {
+                    start.wait();
+                    for _ in 0..QUERIES_EACH {
                         let (results, _, generation) =
                             service.search_with_stats("rust", 5).expect("query failed");
-                        // Every generation contains the word, so an empty
-                        // result would mean a query hit a half-published index.
+                        // Every generation contains the word, so an empty result
+                        // would mean a query hit a half-published index.
                         assert!(
                             !results.is_empty(),
                             "generation {generation} lost a document"
                         );
-                        answered.fetch_add(1, Ordering::Relaxed);
                     }
+                    finished.fetch_add(1, Ordering::SeqCst);
                 })
             })
             .collect();
 
-        for round in 0..5 {
+        start.wait();
+        let mut round = 0;
+        while finished.load(Ordering::SeqCst) < READERS {
             corpus(dir.path(), &[(&format!("gen{round}.md"), "rust again")]);
             service.reindex(dir.path()).unwrap();
+            round += 1;
         }
-        stop.store(true, Ordering::Relaxed);
+
         for reader in readers {
             reader.join().unwrap();
         }
-
-        assert_eq!(service.generation(), 6);
-        assert!(
-            answered.load(Ordering::Relaxed) > 0,
-            "readers never got to run"
-        );
+        assert!(round > 0, "no rebuild overlapped the queries");
+        assert_eq!(service.generation(), round as u64 + 1);
     }
 
     #[test]

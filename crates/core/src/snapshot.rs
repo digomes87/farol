@@ -218,7 +218,8 @@ impl<T: fmt::Debug> fmt::Debug for SnapshotCell<T> {
 #[cfg(all(test, not(loom)))]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering as StdOrdering};
+    use std::sync::atomic::{AtomicUsize, Ordering as StdOrdering};
+    use std::sync::Barrier;
     use std::thread;
 
     #[test]
@@ -284,35 +285,52 @@ mod tests {
     }
 
     #[test]
-    fn readers_keep_making_progress_while_a_writer_swaps() {
-        // Every value published is a multiple of ten, so a reader that ever
-        // observes anything else has seen a torn or freed value.
-        let cell = Arc::new(SnapshotCell::new(0u64));
-        let stop = Arc::new(AtomicBool::new(false));
+    fn readers_never_observe_a_value_that_was_not_published() {
+        // Every published value is a multiple of ten, so a reader that observes
+        // anything else has seen a torn or freed value.
+        //
+        // The reader count is fixed rather than "however many fit before a stop
+        // flag": on a loaded machine the writer can finish its whole run before
+        // a reader is scheduled, and a test that then asserts "some reads
+        // happened" fails for reasons that have nothing to do with the code.
+        const READERS: usize = 4;
+        const READS_EACH: usize = 500;
 
-        let readers: Vec<_> = (0..4)
+        let cell = Arc::new(SnapshotCell::new(0u64));
+        let start = Arc::new(Barrier::new(READERS + 1));
+        let finished = Arc::new(AtomicUsize::new(0));
+
+        let readers: Vec<_> = (0..READERS)
             .map(|_| {
                 let cell = Arc::clone(&cell);
-                let stop = Arc::clone(&stop);
+                let start = Arc::clone(&start);
+                let finished = Arc::clone(&finished);
                 thread::spawn(move || {
-                    let mut seen = 0u64;
-                    while !stop.load(StdOrdering::Relaxed) {
+                    start.wait();
+                    for _ in 0..READS_EACH {
                         let value = cell.load();
                         assert_eq!(*value % 10, 0, "observed a value never published");
-                        seen += 1;
                     }
-                    seen
+                    finished.fetch_add(1, StdOrdering::SeqCst);
                 })
             })
             .collect();
 
-        for generation in 1..2_000u64 {
+        // Publish continuously for as long as anyone is reading, so the swaps
+        // and the loads genuinely overlap instead of merely being concurrent on
+        // paper.
+        start.wait();
+        let mut generation = 1u64;
+        while finished.load(StdOrdering::SeqCst) < READERS {
             cell.store(generation * 10);
+            generation += 1;
         }
-        stop.store(true, StdOrdering::Relaxed);
 
-        let reads: u64 = readers.into_iter().map(|h| h.join().unwrap()).sum();
-        assert!(reads > 0, "readers never got to run");
+        for reader in readers {
+            reader.join().unwrap();
+        }
+        assert!(generation > 1, "the writer never published anything");
+        assert_eq!(*cell.load() % 10, 0);
     }
 
     #[test]
