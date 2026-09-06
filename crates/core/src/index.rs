@@ -484,6 +484,16 @@ impl Index {
         self.docs.is_empty()
     }
 
+    /// Every term in the vocabulary, in arbitrary order.
+    pub fn terms(&self) -> impl Iterator<Item = &str> {
+        self.postings.keys().map(String::as_str)
+    }
+
+    /// Sum of every document length, in terms.
+    pub fn total_length(&self) -> u64 {
+        self.total_length
+    }
+
     /// Number of distinct terms in the vocabulary.
     pub fn vocabulary_size(&self) -> usize {
         self.postings.len()

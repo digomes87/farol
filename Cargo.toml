@@ -16,6 +16,7 @@ bincode = "1.3"
 thiserror = "2"
 rayon = "1.10"
 unicode-normalization = "0.1"
+memmap2 = "0.9"
 
 [profile.release]
 lto = "thin"

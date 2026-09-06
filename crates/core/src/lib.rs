@@ -14,6 +14,7 @@
 //! | [`searcher`] | clauses + index → ranked hits |
 //! | [`snippet`] | matched document → highlighted excerpt |
 //! | [`store`] | index ↔ a single self-describing file |
+//! | [`mmap`] | index ↔ a file read in place, without loading it |
 //! | [`engine`] | the façade tying every stage together |
 //! | [`error`] | the crate wide error type |
 
@@ -24,6 +25,7 @@ pub mod cursor;
 pub mod engine;
 pub mod error;
 pub mod index;
+pub mod mmap;
 pub mod query;
 pub mod searcher;
 pub mod snippet;
