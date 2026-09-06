@@ -1,9 +1,10 @@
 # farol
 
 A full-text search engine written in Rust from first principles — no Lucene, no
-Tantivy, no search dependency. Text analysis, a positional inverted index, BM25
-ranking, WAND dynamic pruning, boolean queries with exact phrases and
-highlighted snippets, in roughly 2,500 lines of tested Rust.
+Tantivy, no search dependency. Text analysis, a positional inverted index with
+delta+varint compressed blocks, BM25 ranking, block-max WAND dynamic pruning, a
+memory-mapped index format, boolean queries with exact phrases and highlighted
+snippets — in roughly 3,500 lines of tested Rust.
 
 [![CI](https://github.com/digomes87/farol/actions/workflows/ci.yml/badge.svg)](https://github.com/digomes87/farol/actions/workflows/ci.yml)
 ![Rust](https://img.shields.io/badge/rust-1.75%2B-orange)
@@ -102,33 +103,56 @@ Every stage is a module with a single responsibility:
 | `query` | query string → `Must` / `Should` / `MustNot` clauses |
 | `searcher` | clauses + index → ranked documents, exhaustive or pruned |
 | `bm25` | postings → relevance score |
-| `cursor` | skip-capable iteration over a posting list |
+| `codec` | delta + varint compression of posting lists |
+| `cursor` | block-skipping iteration over a compressed posting list |
 | `topk` | bounded collector for the best k hits |
 | `snippet` | matched document → highlighted excerpt |
 | `store` | index ↔ a single self-describing file |
+| `mmap` | index ↔ a file read in place, without loading it |
+| `source` | one interface over in-memory and mapped indexes |
 | `engine` | the façade tying it all together |
 
 The reasoning behind each design decision is in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-## Dynamic pruning (WAND)
+## Compressed blocks
+
+Posting lists are sorted, so `farol` stores the gaps between document ids rather
+than the ids themselves, and spends one byte per seven bits of magnitude
+(LEB128). Lists are cut into blocks of 128 postings, each block carrying its
+last document id and its own score bounds.
+
+```console
+$ farol stats
+postings size   1757.0 KiB (3.06 bytes/posting)
+```
+
+On a 5,000 document corpus the index file drops from 15.4 MB to 7.9 MB. The
+block layout is not only about size: `last_doc` lets a query skip a whole block
+by comparing one integer, and the per-block bounds are what the pruning below
+uses.
+
+## Dynamic pruning (block-max WAND)
 
 Scoring every matching document to show ten of them is wasted work. For queries
-of optional terms, `farol` runs **WAND**: it keeps one cursor per term, tracks
-the score of the tenth best document found so far, and uses each term's maximum
-possible contribution to prove that entire stretches of the posting lists cannot
-beat it. Those documents are skipped without ever being scored.
+of optional terms, `farol` runs **block-max WAND**: it keeps one cursor per
+term, tracks the score of the tenth best document found so far, and uses score
+bounds to prove that entire stretches of the posting lists cannot beat it. Those
+documents are skipped without being scored, and whole blocks are skipped without
+being decoded.
 
 ```console
 $ farol search "term0 term1 term2" --explain -n 5
 strategy: wand (dynamic pruning) · candidates: 813 · scored: 104 · skipped: 709 (87% avoided)
 ```
 
-The upper bounds come from the index itself: for every term it stores the
-highest frequency and the shortest document length observed across its postings.
-BM25 grows with frequency and shrinks with length, so that pair bounds the
-term's contribution to *any* document — and the bound holds for every `k1`/`b`,
-which is why it survives runtime tuning of the ranking.
+The bounds come from the index itself: for every term, and again for every
+block, it stores the highest frequency and the shortest document length among
+those postings. BM25 grows with frequency and shrinks with length, so that pair
+bounds the term's contribution — and the bound holds for every `k1`/`b`, which
+is why it survives runtime tuning of the ranking. Per-block bounds are much
+tighter than per-term ones, because a block spans a narrow slice of the
+collection.
 
 Queries with required, excluded or phrase clauses fall back to exhaustive
 evaluation: those clauses already constrain the candidate set, usually harder
@@ -155,20 +179,38 @@ turned off through the library API (`Searcher::with_pruning`) to A/B the two.
 
 Same query, same candidate set, pruning on and off:
 
-| Query | Exhaustive | WAND | Speedup |
-|-------|-----------|------|---------|
-| `term0 term1` | 35.7 µs | **11.2 µs** | 3.2× |
-| `term0 term1 term2 term3` | 74.5 µs | **29.6 µs** | 2.5× |
+| Query | Exhaustive | Block-max WAND | Speedup |
+|-------|-----------|----------------|---------|
+| `term0 term1` | 45.0 µs | **14.4 µs** | 3.1× |
+| `term0 term1 term2 term3` | 93.0 µs | **37.3 µs** | 2.5× |
 
 Two effects are worth separating. The union/intersection pair in the first table
 shows the value of choosing candidates from the required clauses — the same
 query with `+` costs 4× less. The table above shows what pruning buys on top of
 that for queries where no such clause exists.
 
+## Opening an index without loading it
+
+`farol index` writes a layout meant to be read in place: fixed-size records and
+section offsets, a term dictionary sorted for binary search, and posting bytes
+identical to the in-memory ones. Opening it is an `mmap` call and a header
+check — the operating system pages in only what a query touches.
+
+Answering one query from a cold start, on an 80 MB index over 40,000 documents:
+
+| Format | Time to first result | Peak memory |
+|--------|---------------------|-------------|
+| memory-mapped | **2.8 ms** | **6.7 MB** |
+| serialized (`--serialized`) | 39.9 ms | 190.3 MB |
+
+Reading picks the format from the file itself, so both keep working and no flag
+has to be remembered. A mapped index is read-only; indexing into one reports
+that rather than failing obscurely.
+
 ## Development
 
 ```bash
-cargo test --workspace      # 112 tests: unit, doc, relevance and end-to-end
+cargo test --workspace      # 148 tests: unit, doc, relevance and end-to-end
 cargo bench -p farol-core   # criterion benchmarks
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all --check
@@ -182,8 +224,9 @@ quietly get worse.
 
 ## Known limitations
 
-- The whole index lives in memory and is rewritten on every indexing run; there
-  is no incremental update and no document deletion.
+- Indexing rewrites the whole index; there is no incremental update and no
+  document deletion. Searching a mapped index does not load it, but building one
+  still holds it in memory.
 - The original text is stored inside the index to support snippets, which
   roughly doubles the size on disk.
 - The stemmer is heuristic and covers Portuguese and English; other languages
