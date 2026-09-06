@@ -1,10 +1,10 @@
 //! Text analysis: the pipeline that turns raw text into indexable terms.
 //!
 //! ```text
-//! "Corações Fortes!"  ->  normalize  ->  "coracoes fortes!"
-//!                     ->  tokenize   ->  ["coracoes", "fortes"]
-//!                     ->  stopwords  ->  ["coracoes", "fortes"]
-//!                     ->  stem       ->  ["coraca", "fort"]
+//! "Strong Hearts!"  ->  normalize  ->  "strong hearts!"
+//!                   ->  tokenize   ->  ["strong", "hearts"]
+//!                   ->  stopwords  ->  ["strong", "hearts"]
+//!                   ->  stem       ->  ["strong", "heart"]
 //! ```
 //!
 //! The same [`Analyzer`] instance must be used for indexing and querying,
@@ -298,15 +298,17 @@ mod tests {
     #[test]
     fn analyze_keeps_positions_across_removed_stopwords() {
         let analyzer = Analyzer::default();
-        let tokens = analyzer.analyze("o canto de uma sereia");
+        let tokens = analyzer.analyze("the song of a siren");
         let terms: Vec<_> = tokens.iter().map(|t| t.term.as_str()).collect();
-        assert_eq!(terms, ["canto", "sereia"]);
+        assert_eq!(terms, ["song", "siren"]);
         assert_eq!(tokens[0].position, 1);
         assert_eq!(tokens[1].position, 4);
     }
 
     #[test]
     fn indexing_and_query_produce_the_same_terms() {
+        // Portuguese support: the plural in the document and the singular in
+        // the query must converge on the same terms.
         let analyzer = Analyzer::default();
         let indexed = analyzer.terms("As MIGRAÇÕES dos pássaros");
         let queried = analyzer.terms("migração de pássaro");
@@ -325,9 +327,9 @@ mod tests {
 
     #[test]
     fn offsets_point_at_the_original_word() {
-        let text = "Migrações anuais";
+        let text = "Résumé parsing";
         let analyzer = Analyzer::default();
         let tokens = analyzer.analyze(text);
-        assert_eq!(&text[tokens[0].start..tokens[0].end], "Migrações");
+        assert_eq!(&text[tokens[0].start..tokens[0].end], "Résumé");
     }
 }

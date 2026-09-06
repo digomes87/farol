@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! farol index ./docs          build an index from a directory
-//! farol search "+rust busca"  query it
+//! farol search "+rust engine" query it
 //! farol repl                  keep the index hot and query interactively
 //! farol stats                 inspect the index
 //! ```

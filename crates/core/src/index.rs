@@ -94,7 +94,7 @@ impl TermIndex {
 /// use farol_core::{Analyzer, Index};
 ///
 /// let mut index = Index::new(Analyzer::default());
-/// index.add("doc-1", "Ferrugem", "O caranguejo Ferris aprende Rust");
+/// index.add("doc-1", "Ferris the crab", "The crab named Ferris learns Rust");
 ///
 /// assert_eq!(index.len(), 1);
 /// assert_eq!(index.doc_freq("rust"), 1);

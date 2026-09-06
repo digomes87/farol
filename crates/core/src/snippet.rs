@@ -261,12 +261,12 @@ collector, and that rust does it at compile time. A third paragraph closes.";
 
     #[test]
     fn windows_never_split_a_multibyte_character() {
-        let text = "ação é acentuação repetida ação é acentuação repetida ação";
+        let text = "café résumé naïve café résumé naïve café résumé naïve café";
         for max in 16..48 {
             let snippet = Highlighter::default().with_max_chars(max).snippet(
                 text,
                 &Analyzer::raw(),
-                &["acentuacao"],
+                &["resume"],
             );
             assert!(!snippet.text.is_empty());
         }

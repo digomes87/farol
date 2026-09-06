@@ -6,7 +6,7 @@
 //!
 //! let mut engine = Engine::default();
 //! engine.index_dir("./corpus")?;
-//! for hit in engine.search("+rust \"motor de busca\"", 5)? {
+//! for hit in engine.search("+rust \"search engine\"", 5)? {
 //!     println!("{:.3}  {}", hit.score, hit.title);
 //! }
 //! # Ok::<(), farol_core::Error>(())

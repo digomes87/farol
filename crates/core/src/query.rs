@@ -5,11 +5,12 @@
 //! | `rust search` | either term may match; documents with both rank higher |
 //! | `+rust` | the document **must** contain the term |
 //! | `-java` | the document **must not** contain the term |
-//! | `"motor de busca"` | the words must appear adjacent, in this order |
-//! | `+"motor de busca"` | …and the phrase is mandatory |
+//! | `"search engine"` | the words must appear adjacent, in this order |
+//! | `+"search engine"` | …and the phrase is mandatory |
 //!
 //! Every fragment goes through the same [`Analyzer`] used at index time, so a
-//! query for `"Migrações"` finds a document that says `migracao`.
+//! query for `"Migrações"` finds a document that says `migracao` — the
+//! analyzer covers Portuguese and English alike.
 
 use crate::analyzer::Analyzer;
 use crate::error::{Error, Result};
@@ -62,7 +63,7 @@ impl Query {
     /// ```
     /// use farol_core::{Analyzer, Occur, Query};
     ///
-    /// let query = Query::parse(r#"+rust "motor de busca" -java"#, &Analyzer::default())?;
+    /// let query = Query::parse(r#"+rust "search engine" -java"#, &Analyzer::default())?;
     /// assert_eq!(query.clauses.len(), 3);
     /// assert_eq!(query.clauses[0].occur, Occur::Must);
     /// # Ok::<(), farol_core::Error>(())
@@ -223,11 +224,11 @@ mod tests {
 
     #[test]
     fn quoted_text_becomes_a_phrase_with_relative_offsets() {
-        let query = parse("\"motor de busca\"").unwrap();
+        let query = parse("\"the search engine\"").unwrap();
         match &query.clauses[0].kind {
             ClauseKind::Phrase(parts) => {
-                assert_eq!(parts[0], ("motor".to_string(), 0));
-                assert_eq!(parts[2], ("busca".to_string(), 2));
+                assert_eq!(parts[0], ("the".to_string(), 0));
+                assert_eq!(parts[2], ("engine".to_string(), 2));
             }
             other => panic!("expected a phrase, got {other:?}"),
         }
@@ -235,12 +236,12 @@ mod tests {
 
     #[test]
     fn phrase_offsets_keep_the_gap_left_by_a_stopword() {
-        let query = Query::parse("\"canto de sereia\"", &Analyzer::default()).unwrap();
+        let query = Query::parse("\"song of sirens\"", &Analyzer::default()).unwrap();
         match &query.clauses[0].kind {
             ClauseKind::Phrase(parts) => {
                 assert_eq!(parts.len(), 2);
                 assert_eq!(parts[0].1, 0);
-                assert_eq!(parts[1].1, 2, "the dropped `de` must still occupy a slot");
+                assert_eq!(parts[1].1, 2, "the dropped `of` must still occupy a slot");
             }
             other => panic!("expected a phrase, got {other:?}"),
         }
@@ -254,14 +255,14 @@ mod tests {
 
     #[test]
     fn a_phrase_can_be_required_or_forbidden() {
-        let query = parse("+\"motor busca\" -\"maquina virtual\"").unwrap();
+        let query = parse("+\"search engine\" -\"virtual machine\"").unwrap();
         assert_eq!(query.clauses[0].occur, Occur::Must);
         assert_eq!(query.clauses[1].occur, Occur::MustNot);
     }
 
     #[test]
     fn unterminated_quote_is_rejected() {
-        let err = parse("\"motor de busca").unwrap_err();
+        let err = parse("\"search engine").unwrap_err();
         assert!(err.to_string().contains("unterminated quote"));
     }
 
@@ -279,12 +280,13 @@ mod tests {
 
     #[test]
     fn positive_terms_ignore_exclusions() {
-        let query = parse("+rust \"motor busca\" -java").unwrap();
-        assert_eq!(query.positive_terms(), ["rust", "motor", "busca"]);
+        let query = parse("+rust \"search engine\" -java").unwrap();
+        assert_eq!(query.positive_terms(), ["rust", "search", "engine"]);
     }
 
     #[test]
     fn queries_are_analyzed_like_documents() {
+        // Accented Portuguese input, folded and stemmed like any other text.
         let query = Query::parse("MIGRAÇÕES", &Analyzer::default()).unwrap();
         assert_eq!(query.clauses[0].kind, ClauseKind::Term("migr".into()));
     }
