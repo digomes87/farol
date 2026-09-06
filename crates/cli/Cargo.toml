@@ -12,6 +12,9 @@ authors.workspace = true
 name = "farol"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 farol-core = { path = "../core" }
 clap = { version = "4", features = ["derive"] }

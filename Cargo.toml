@@ -18,6 +18,11 @@ rayon = "1.10"
 unicode-normalization = "0.1"
 memmap2 = "0.9"
 
+[workspace.lints.rust]
+# `loom` builds are opt-in through `RUSTFLAGS="--cfg loom"`; declaring the cfg
+# here keeps normal builds from warning about it.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)'] }
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

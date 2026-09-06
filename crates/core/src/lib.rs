@@ -15,6 +15,7 @@
 //! | [`snippet`] | matched document → highlighted excerpt |
 //! | [`store`] | index ↔ a single self-describing file |
 //! | [`mmap`] | index ↔ a file read in place, without loading it |
+//! | [`snapshot`] | lock-free publication of a new index to live readers |
 //! | [`source`] | one interface over in-memory and mapped indexes |
 //! | [`engine`] | the façade tying every stage together |
 //! | [`error`] | the crate wide error type |
@@ -29,6 +30,7 @@ pub mod index;
 pub mod mmap;
 pub mod query;
 pub mod searcher;
+pub mod snapshot;
 pub mod snippet;
 pub mod source;
 pub mod store;
