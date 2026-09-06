@@ -90,8 +90,8 @@ pub fn explain(stats: &SearchStats, style: &Style) -> String {
         0.0
     };
     style.dim(&format!(
-        "strategy: {strategy} · candidates: {} · scored: {} · skipped: {} ({saved:.0}% avoided)\n\n",
-        stats.candidates, stats.scored, stats.pruned
+        "strategy: {strategy} · postings: {} · scored: {} · skipped: {} · blocks skipped: {} ({saved:.0}% avoided)\n\n",
+        stats.candidates, stats.scored, stats.pruned, stats.blocks_skipped
     ))
 }
 
@@ -106,6 +106,7 @@ pub fn results_json(
         "query": query,
         "elapsed_ms": elapsed_ms,
         "count": results.len(),
+        "blocks_skipped": stats.blocks_skipped,
         "strategy": match stats.strategy {
             Strategy::Wand => "wand",
             Strategy::Exhaustive => "exhaustive",
@@ -190,6 +191,7 @@ mod tests {
             scored: 3,
             candidates: 12,
             pruned: 9,
+            blocks_skipped: 2,
             strategy: Strategy::Wand,
         }
     }
@@ -210,5 +212,6 @@ mod tests {
         let text = explain(&stats_sample(), &style);
         assert!(text.contains("wand"), "{text}");
         assert!(text.contains("75% avoided"), "{text}");
+        assert!(text.contains("blocks skipped: 2"), "{text}");
     }
 }

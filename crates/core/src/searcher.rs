@@ -13,7 +13,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::bm25::Bm25;
-use crate::cursor::PostingCursor;
+use crate::cursor::BlockCursor;
 use crate::index::{DocId, Index, Posting};
 use crate::query::{ClauseKind, Occur, Query};
 use crate::topk::TopK;
@@ -36,11 +36,14 @@ pub struct Hit {
 pub struct SearchStats {
     /// Documents that were fully scored with BM25.
     pub scored: usize,
-    /// Documents that matched at least one clause.
+    /// Postings the query would have had to visit without pruning.
     pub candidates: usize,
-    /// Documents skipped because their score bound could not reach the
+    /// Postings skipped because their score bound could not reach the
     /// threshold. Always zero for the exhaustive strategy.
     pub pruned: usize,
+    /// Blocks skipped whole, without decoding them, because the block's own
+    /// bound could not reach the threshold.
+    pub blocks_skipped: usize,
     /// Which evaluation strategy ran.
     pub strategy: Strategy,
 }
@@ -52,7 +55,8 @@ pub enum Strategy {
     #[default]
     Exhaustive,
     /// Documents whose maximum possible score cannot reach the current
-    /// threshold are skipped without ever being scored.
+    /// threshold are skipped without ever being scored, and whole blocks of
+    /// postings are skipped without being decoded.
     Wand,
 }
 
@@ -144,8 +148,9 @@ impl<'a> Searcher<'a> {
     /// preceding cursor is already on it — or skips those cursors straight to
     /// it, never touching what lies in between.
     fn search_wand(&self, query: &Query, limit: usize) -> (Vec<Hit>, SearchStats) {
-        let mut decoded: Vec<(Vec<Posting>, f32, f32)> = Vec::new();
-        let mut candidates: HashSet<DocId> = HashSet::new();
+        let avg = self.index.avg_doc_len();
+        let mut cursors: Vec<BlockCursor<'_>> = Vec::new();
+        let mut candidates = 0usize;
 
         for clause in &query.clauses {
             let ClauseKind::Term(term) = &clause.kind else {
@@ -155,24 +160,12 @@ impl<'a> Searcher<'a> {
                 continue;
             };
             let idf = self.bm25.idf(term_index.doc_freq(), self.index.len());
-            let upper_bound = self.bm25.score(
-                term_index.max_tf(),
-                term_index.min_len(),
-                self.index.avg_doc_len(),
-                idf,
-            );
-            let postings = term_index.decode_all();
-            candidates.extend(postings.iter().map(|p| p.doc));
-            decoded.push((postings, idf, upper_bound));
+            candidates += term_index.doc_freq() as usize;
+            cursors.push(BlockCursor::new(term_index, idf, self.bm25, avg));
         }
 
-        let mut cursors: Vec<PostingCursor<'_>> = decoded
-            .iter()
-            .map(|(postings, idf, upper_bound)| PostingCursor::new(postings, *idf, *upper_bound))
-            .collect();
-
         let mut stats = SearchStats {
-            candidates: candidates.len(),
+            candidates,
             strategy: Strategy::Wand,
             ..SearchStats::default()
         };
@@ -180,11 +173,10 @@ impl<'a> Searcher<'a> {
             return (Vec::new(), stats);
         }
 
-        let avg = self.index.avg_doc_len();
         let mut topk = TopK::new(limit);
 
         loop {
-            // Exhausted cursors sort to the end and are then cut away.
+            // Exhausted cursors sort to the end and are then dropped.
             cursors.sort_unstable_by_key(|c| c.doc().unwrap_or(DocId::MAX));
             cursors.retain(|c| !c.is_exhausted());
             if cursors.is_empty() {
@@ -192,13 +184,59 @@ impl<'a> Searcher<'a> {
             }
 
             let threshold = topk.threshold();
-            let Some(pivot) = find_pivot(&cursors, threshold) else {
+            let Some(mut pivot) = find_pivot(&cursors, threshold) else {
                 // Not even every remaining term together can beat the
                 // threshold: nothing left in the index can enter the top k.
-                stats.pruned += cursors.iter().map(PostingCursor::remaining).sum::<usize>();
+                stats.pruned += cursors.iter().map(BlockCursor::remaining).sum::<usize>();
                 break;
             };
             let pivot_doc = cursors[pivot].doc().expect("pivot cursor is not exhausted");
+
+            // Cursors sitting on the same document as the pivot contribute to
+            // it too. Leaving them out of the bound below would underestimate
+            // the document's score and prune a document that belongs in the
+            // results.
+            while pivot + 1 < cursors.len() && cursors[pivot + 1].doc() == Some(pivot_doc) {
+                pivot += 1;
+            }
+
+            // Block-max refinement. The term-wide bounds said this pivot is
+            // worth considering; the bounds of the blocks the cursors actually
+            // sit on are tighter and often say otherwise.
+            let block_sum: f32 = cursors[..=pivot]
+                .iter()
+                .map(|c| c.block_upper_bound_at(pivot_doc))
+                .sum();
+            if block_sum <= threshold {
+                // No document up to the end of the shallowest block can beat
+                // the threshold: jump past it. Documents below the pivot were
+                // already ruled out by the pivot itself.
+                let block_end = cursors[..=pivot]
+                    .iter()
+                    .filter_map(|c| c.block_last_doc_at(pivot_doc))
+                    .min()
+                    .unwrap_or(pivot_doc);
+                // Stop at the next cursor's document: beyond it, terms that
+                // were not part of the bound above start matching again, so
+                // nothing has been proven about those documents.
+                let next_cursor_doc = cursors
+                    .get(pivot + 1)
+                    .and_then(BlockCursor::doc)
+                    .unwrap_or(DocId::MAX);
+                let target = block_end
+                    .saturating_add(1)
+                    .min(next_cursor_doc)
+                    .max(pivot_doc + 1);
+
+                for cursor in cursors[..=pivot].iter_mut() {
+                    let postings_before = cursor.remaining();
+                    let block_before = cursor.block_index();
+                    cursor.advance_to(target);
+                    stats.pruned += postings_before - cursor.remaining();
+                    stats.blocks_skipped += cursor.block_index() - block_before;
+                }
+                continue;
+            }
 
             if cursors[0].doc() == Some(pivot_doc) {
                 // Every cursor up to the pivot is on this document: score it.
@@ -388,10 +426,10 @@ fn count_phrase_occurrences(aligned: &[(&[u32], u32)]) -> u32 {
 /// `cursors` must be sorted by current document. Returns `None` when even the
 /// sum of every remaining bound cannot beat the threshold, which means the
 /// search is finished.
-fn find_pivot(cursors: &[PostingCursor<'_>], threshold: f32) -> Option<usize> {
+fn find_pivot(cursors: &[BlockCursor<'_>], threshold: f32) -> Option<usize> {
     let mut accumulated = 0.0;
     for (idx, cursor) in cursors.iter().enumerate() {
-        accumulated += cursor.upper_bound();
+        accumulated += cursor.term_upper_bound();
         if accumulated > threshold {
             return Some(idx);
         }
@@ -497,22 +535,33 @@ mod tests {
         assert!(ranked.windows(2).all(|w| w[0].1 >= w[1].1));
     }
 
-    /// A corpus with a skewed term distribution: `term0` is everywhere, the
-    /// rare terms appear in a handful of documents. Uniform frequencies would
-    /// make every posting list the same length and hide what pruning does.
+    /// A corpus shaped like natural language rather than like a uniform grid.
+    ///
+    /// Term frequencies and document lengths both vary, which matters for more
+    /// than realism: with uniform values every block of a posting list would
+    /// have the same bound as the term itself, and block-max pruning would have
+    /// nothing tighter to work with.
     fn skewed_index(docs: usize) -> Index {
         let mut index = Index::new(Analyzer::raw());
         for id in 0..docs {
             let mut text = String::new();
+            // Terms cluster: they are prominent in the first tenth of the
+            // collection and incidental afterwards. Real corpora behave this
+            // way — documents arrive in batches that share a subject — and it
+            // is what gives blocks bounds that differ from the term's own.
+            let repeats = if id < docs / 10 { 6 } else { 1 };
             for term in 0..8 {
                 // Term `t` appears in every `2^t`-th document.
                 if id % (1 << term) == 0 {
-                    for _ in 0..=(term % 3) {
+                    for _ in 0..repeats {
                         text.push_str(&format!("term{term} "));
                     }
                 }
             }
-            text.push_str(&format!("filler{} padding words here", id % 7));
+            // Documents differ in length by an order of magnitude.
+            for filler in 0..(1 + id % 40) {
+                text.push_str(&format!("filler{filler} "));
+            }
             index.add(format!("d{id}"), format!("Doc {id}"), &text);
         }
         index.finish();
@@ -558,6 +607,35 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn pruning_holds_under_retuned_ranking_parameters() {
+        // The score bounds are stored as (max_tf, min_len) precisely so they
+        // stay valid when k1 and b change at query time. If that reasoning were
+        // wrong, pruning would drop documents here.
+        let index = skewed_index(800);
+        let analyzer = Analyzer::raw();
+        let query = Query::parse("term0 term1 term4", &analyzer).unwrap();
+
+        for bm25 in [
+            Bm25::new(2.0, 0.3),
+            Bm25::new(0.5, 1.0),
+            Bm25::new(0.0, 0.0),
+        ] {
+            let pruned = Searcher::new(&index).with_bm25(bm25).search(&query, 10);
+            let exhaustive = Searcher::new(&index)
+                .with_bm25(bm25)
+                .with_pruning(false)
+                .search(&query, 10);
+            assert_eq!(
+                pruned.iter().map(|h| h.doc).collect::<Vec<_>>(),
+                exhaustive.iter().map(|h| h.doc).collect::<Vec<_>>(),
+                "k1={} b={} changed the ranking",
+                bm25.k1,
+                bm25.b
+            );
         }
     }
 
@@ -612,6 +690,19 @@ mod tests {
                 "`{input}` cannot be pruned safely"
             );
         }
+    }
+
+    #[test]
+    fn block_max_bounds_skip_whole_blocks() {
+        // Long posting lists are where block-max pays off: with only a couple
+        // of blocks per term there is nothing to skip over.
+        let index = skewed_index(6_000);
+        let analyzer = Analyzer::raw();
+        let query = Query::parse("term0 term5 term7", &analyzer).unwrap();
+
+        let (_, stats) = Searcher::new(&index).search_with_stats(&query, 10);
+        assert!(stats.blocks_skipped > 0, "no block was skipped: {stats:?}");
+        assert!(stats.scored < stats.candidates / 4);
     }
 
     #[test]
