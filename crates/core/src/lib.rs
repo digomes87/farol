@@ -15,6 +15,7 @@
 //! | [`snippet`] | matched document → highlighted excerpt |
 //! | [`store`] | index ↔ a single self-describing file |
 //! | [`mmap`] | index ↔ a file read in place, without loading it |
+//! | [`source`] | one interface over in-memory and mapped indexes |
 //! | [`engine`] | the façade tying every stage together |
 //! | [`error`] | the crate wide error type |
 
@@ -29,6 +30,7 @@ pub mod mmap;
 pub mod query;
 pub mod searcher;
 pub mod snippet;
+pub mod source;
 pub mod store;
 pub mod topk;
 
@@ -37,6 +39,8 @@ pub use bm25::Bm25;
 pub use engine::{Engine, SearchResult, Stats};
 pub use error::{Error, Result};
 pub use index::{DocId, Document, Index, Posting};
+pub use mmap::MappedIndex;
 pub use query::{Clause, ClauseKind, Occur, Query};
 pub use searcher::{Hit, SearchStats, Searcher, Strategy};
 pub use snippet::{Highlighter, Snippet};
+pub use source::IndexSource;

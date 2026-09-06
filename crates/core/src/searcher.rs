@@ -14,8 +14,9 @@ use std::collections::{HashMap, HashSet};
 
 use crate::bm25::Bm25;
 use crate::cursor::BlockCursor;
-use crate::index::{DocId, Index, Posting};
+use crate::index::{DocId, Posting};
 use crate::query::{ClauseKind, Occur, Query};
+use crate::source::IndexSource;
 use crate::topk::TopK;
 
 /// One ranked document.
@@ -66,13 +67,13 @@ pub enum Strategy {
 /// fine, and several can run concurrently over the same index.
 #[derive(Debug, Clone)]
 pub struct Searcher<'a> {
-    index: &'a Index,
+    index: &'a IndexSource,
     bm25: Bm25,
     pruning: bool,
 }
 
 impl<'a> Searcher<'a> {
-    pub fn new(index: &'a Index) -> Self {
+    pub fn new(index: &'a IndexSource) -> Self {
         Self {
             index,
             bm25: Bm25::default(),
@@ -96,7 +97,7 @@ impl<'a> Searcher<'a> {
         self
     }
 
-    pub fn index(&self) -> &Index {
+    pub fn index(&self) -> &IndexSource {
         self.index
     }
 
@@ -441,8 +442,9 @@ fn find_pivot(cursors: &[BlockCursor<'_>], threshold: f32) -> Option<usize> {
 mod tests {
     use super::*;
     use crate::analyzer::Analyzer;
+    use crate::index::Index;
 
-    fn index() -> Index {
+    fn index() -> IndexSource {
         let mut index = Index::new(Analyzer::raw());
         index.add("d0", "Rust", "rust is a fast and safe systems language");
         index.add(
@@ -457,7 +459,7 @@ mod tests {
         );
         index.add("d3", "Java", "java is a language with a virtual machine");
         index.finish();
-        index
+        IndexSource::from(index)
     }
 
     fn run(input: &str, limit: usize) -> Vec<(String, f32)> {
@@ -541,7 +543,7 @@ mod tests {
     /// than realism: with uniform values every block of a posting list would
     /// have the same bound as the term itself, and block-max pruning would have
     /// nothing tighter to work with.
-    fn skewed_index(docs: usize) -> Index {
+    fn skewed_index(docs: usize) -> IndexSource {
         let mut index = Index::new(Analyzer::raw());
         for id in 0..docs {
             let mut text = String::new();
@@ -565,7 +567,7 @@ mod tests {
             index.add(format!("d{id}"), format!("Doc {id}"), &text);
         }
         index.finish();
-        index
+        IndexSource::from(index)
     }
 
     #[test]
@@ -724,7 +726,7 @@ mod tests {
 
     #[test]
     fn searching_an_empty_index_is_not_an_error() {
-        let index = Index::new(Analyzer::raw());
+        let index = IndexSource::default();
         let query = Query::parse("rust", &Analyzer::raw()).unwrap();
         assert!(Searcher::new(&index).search(&query, 10).is_empty());
     }

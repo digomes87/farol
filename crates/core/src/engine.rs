@@ -21,9 +21,11 @@ use crate::analyzer::Analyzer;
 use crate::bm25::Bm25;
 use crate::error::{Error, Result};
 use crate::index::Index;
+use crate::mmap::{self, MappedIndex};
 use crate::query::Query;
 use crate::searcher::{SearchStats, Searcher};
 use crate::snippet::Highlighter;
+use crate::source::IndexSource;
 use crate::store;
 
 /// File extensions crawled by [`Engine::index_dir`] unless overridden.
@@ -55,12 +57,17 @@ pub struct Stats {
     pub avg_doc_len: f32,
     /// Bytes of compressed posting data.
     pub postings_bytes: usize,
+    /// Whether the index is being read from a mapping rather than from memory.
+    pub mapped: bool,
 }
 
 /// A complete search engine over a document collection.
-#[derive(Debug, Clone)]
+///
+/// Not `Clone`: a mapped index is a file mapping, and duplicating one silently
+/// would hide how much a copy costs.
+#[derive(Debug)]
 pub struct Engine {
-    index: Index,
+    index: IndexSource,
     bm25: Bm25,
     highlighter: Highlighter,
     extensions: Vec<String>,
@@ -76,7 +83,7 @@ impl Engine {
     /// Creates an empty engine using `analyzer` for both indexing and querying.
     pub fn new(analyzer: Analyzer) -> Self {
         Self {
-            index: Index::new(analyzer),
+            index: IndexSource::from(Index::new(analyzer)),
             bm25: Bm25::default(),
             highlighter: Highlighter::default(),
             extensions: DEFAULT_EXTENSIONS.iter().map(|e| e.to_string()).collect(),
@@ -109,9 +116,21 @@ impl Engine {
     }
 
     /// Indexes a single in-memory document.
-    pub fn add_document(&mut self, uri: impl Into<String>, title: impl Into<String>, text: &str) {
-        self.index.add(uri, title, text);
-        self.index.finish();
+    ///
+    /// # Errors
+    ///
+    /// Fails when the engine is backed by a memory-mapped index, which is
+    /// read-only.
+    pub fn add_document(
+        &mut self,
+        uri: impl Into<String>,
+        title: impl Into<String>,
+        text: &str,
+    ) -> Result<()> {
+        let index = self.index.as_memory_mut()?;
+        index.add(uri, title, text);
+        index.finish();
+        Ok(())
     }
 
     /// Recursively indexes every matching file under `root`.
@@ -129,6 +148,8 @@ impl Engine {
     pub fn index_dir(&mut self, root: impl AsRef<Path>) -> Result<usize> {
         let files = self.collect_files(root.as_ref())?;
         let analyzer = self.index.analyzer().clone();
+        // Fail before doing any work if this engine cannot be written to.
+        self.index.as_memory_mut()?;
 
         let shards: Vec<Index> = files
             .par_chunks(INDEX_CHUNK)
@@ -146,10 +167,11 @@ impl Engine {
             })
             .collect::<Result<Vec<_>>>()?;
 
+        let index = self.index.as_memory_mut()?;
         for shard in shards {
-            self.index.merge(shard);
+            index.merge(shard);
         }
-        self.index.finish();
+        index.finish();
         Ok(files.len())
     }
 
@@ -197,22 +219,53 @@ impl Engine {
             postings: self.index.total_postings(),
             avg_doc_len: self.index.avg_doc_len(),
             postings_bytes: self.index.postings_bytes(),
+            mapped: self.index.is_mapped(),
         }
     }
 
-    pub fn index(&self) -> &Index {
+    pub fn index(&self) -> &IndexSource {
         &self.index
     }
 
-    /// Persists the index to `path`.
+    /// Persists the index in the memory-mapped layout.
+    ///
+    /// This is the default format: it is the one that can be reopened without
+    /// loading, and [`load`](Engine::load) recognises both.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
-        store::save(&self.index, path)
+        match &self.index {
+            IndexSource::Memory(index) => mmap::write(index, path),
+            IndexSource::Mapped(index) => Err(Error::Query(format!(
+                "`{}` is already a mapped index; there is nothing to write",
+                index.path().display()
+            ))),
+        }
     }
 
-    /// Loads an index previously written by [`save`](Engine::save), keeping the
-    /// analyzer and ranking configuration of `self`.
+    /// Persists the index in the serialised layout of [`store`].
+    pub fn save_serialized(&self, path: impl AsRef<Path>) -> Result<()> {
+        match &self.index {
+            IndexSource::Memory(index) => store::save(index, path),
+            IndexSource::Mapped(index) => Err(Error::Query(format!(
+                "`{}` is a mapped index and cannot be re-serialised",
+                index.path().display()
+            ))),
+        }
+    }
+
+    /// Opens an index written by either format, choosing by what the file says
+    /// it is rather than by an argument the caller has to get right.
+    ///
+    /// A mapped file is mapped — no loading, no allocation proportional to the
+    /// index. A serialised one is read and decoded as before.
     pub fn load(&mut self, path: impl AsRef<Path>) -> Result<()> {
-        self.index = store::load(path, self.index.analyzer().clone())?;
+        let path = path.as_ref();
+        let analyzer = self.index.analyzer().clone();
+        self.index = match MappedIndex::open(path, analyzer.clone()) {
+            Ok(mapped) => IndexSource::from(mapped),
+            // Not a mapped file: fall back to the serialised format, and report
+            // that error instead if it is not one of those either.
+            Err(_) => IndexSource::from(store::load(path, analyzer)?),
+        };
         Ok(())
     }
 
@@ -320,8 +373,7 @@ mod tests {
         let uris: Vec<_> = engine
             .index()
             .documents()
-            .iter()
-            .map(|d| d.uri.clone())
+            .map(|d| d.uri.to_string())
             .collect();
         let mut sorted = uris.clone();
         sorted.sort();
@@ -345,8 +397,7 @@ mod tests {
         let titles: Vec<_> = engine
             .index()
             .documents()
-            .iter()
-            .map(|d| d.title.clone())
+            .map(|d| d.title.to_string())
             .collect();
         assert!(titles.contains(&"Rust".to_string()));
     }
@@ -387,7 +438,7 @@ mod tests {
     #[test]
     fn an_unparsable_query_is_an_error_not_an_empty_result() {
         let mut engine = Engine::default();
-        engine.add_document("a", "A", "text");
+        engine.add_document("a", "A", "text").unwrap();
         assert!(engine.search("\"unterminated", 5).is_err());
     }
 
@@ -406,7 +457,7 @@ mod tests {
     }
 
     #[test]
-    fn an_engine_round_trips_through_disk() {
+    fn an_engine_round_trips_through_a_mapped_index() {
         let dir = corpus();
         let mut engine = Engine::default();
         engine.index_dir(dir.path()).unwrap();
@@ -415,7 +466,66 @@ mod tests {
 
         let mut reopened = Engine::default();
         reopened.load(&path).unwrap();
-        assert_eq!(reopened.stats(), engine.stats());
+        assert!(reopened.index().is_mapped(), "load should map the file");
+        assert_eq!(
+            Stats {
+                mapped: false,
+                ..reopened.stats()
+            },
+            engine.stats()
+        );
         assert_eq!(reopened.search("goroutines", 5).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn an_engine_round_trips_through_the_serialised_format_too() {
+        let dir = corpus();
+        let mut engine = Engine::default();
+        engine.index_dir(dir.path()).unwrap();
+        let path = dir.path().join("index.bincode");
+        engine.save_serialized(&path).unwrap();
+
+        let mut reopened = Engine::default();
+        reopened.load(&path).unwrap();
+        assert!(
+            !reopened.index().is_mapped(),
+            "the serialised format cannot be mapped"
+        );
+        assert_eq!(reopened.stats(), engine.stats());
+    }
+
+    #[test]
+    fn both_formats_return_the_same_results() {
+        let dir = corpus();
+        let mut engine = Engine::default();
+        engine.index_dir(dir.path()).unwrap();
+        engine.save(dir.path().join("m.idx")).unwrap();
+        engine.save_serialized(dir.path().join("s.idx")).unwrap();
+
+        let results = |name: &str| {
+            let mut engine = Engine::default();
+            engine.load(dir.path().join(name)).unwrap();
+            engine
+                .search("garbage collector", 10)
+                .unwrap()
+                .into_iter()
+                .map(|r| (r.uri, r.snippet))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(results("m.idx"), results("s.idx"));
+    }
+
+    #[test]
+    fn a_mapped_index_refuses_further_indexing() {
+        let dir = corpus();
+        let mut engine = Engine::default();
+        engine.index_dir(dir.path()).unwrap();
+        let path = dir.path().join("index.farol");
+        engine.save(&path).unwrap();
+
+        let mut reopened = Engine::default();
+        reopened.load(&path).unwrap();
+        let err = reopened.index_dir(dir.path()).unwrap_err();
+        assert!(err.to_string().contains("read-only"), "{err}");
     }
 }

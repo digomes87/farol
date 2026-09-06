@@ -98,6 +98,52 @@ fn json_output_carries_the_evaluation_counters() {
 }
 
 #[test]
+fn a_closed_pipe_is_not_a_crash() {
+    let dir = tempfile::tempdir().unwrap();
+    let index = indexed(dir.path());
+
+    // `head` exits after one line and closes the pipe; the search must end
+    // quietly instead of panicking on the write.
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(format!(
+            "{} search index -i {index} -n 10 | head -1",
+            env!("CARGO_BIN_EXE_farol")
+        ))
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stderr.contains("panicked"), "{stderr}");
+}
+
+#[test]
+fn the_index_can_be_written_in_either_format() {
+    let dir = tempfile::tempdir().unwrap();
+    let mapped = dir.path().join("m.idx").display().to_string();
+    let serialized = dir.path().join("s.idx").display().to_string();
+    let corpus = corpus().display().to_string();
+
+    assert!(farol(&["index", &corpus, "-i", &mapped]).status.success());
+    assert!(
+        farol(&["index", &corpus, "-i", &serialized, "--serialized"])
+            .status
+            .success()
+    );
+
+    // Reading picks the format from the file, not from a flag.
+    assert!(stdout(&farol(&["stats", "-i", &mapped])).contains("memory-mapped"));
+    assert!(stdout(&farol(&["stats", "-i", &serialized])).contains("in memory"));
+
+    let results = |index: &str| {
+        let output = farol(&["search", "stemming", "-i", index, "--json"]);
+        let parsed: serde_json::Value = serde_json::from_str(&stdout(&output)).unwrap();
+        parsed["results"].to_string()
+    };
+    assert_eq!(results(&mapped), results(&serialized));
+}
+
+#[test]
 fn a_missing_index_fails_with_a_helpful_message() {
     let output = farol(&["search", "rust", "-i", "/tmp/does-not-exist.idx"]);
     assert!(!output.status.success());

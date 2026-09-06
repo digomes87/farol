@@ -7,7 +7,7 @@
 //! the cost the query planner is designed to avoid.
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
-use farol_core::{Analyzer, Index, Query, Searcher, Strategy};
+use farol_core::{Analyzer, Index, IndexSource, Query, Searcher, Strategy};
 
 const DOCS: usize = 5_000;
 const TERMS_PER_DOC: usize = 120;
@@ -46,13 +46,13 @@ fn corpus() -> Vec<String> {
         .collect()
 }
 
-fn build(corpus: &[String]) -> Index {
+fn build(corpus: &[String]) -> IndexSource {
     let mut index = Index::new(Analyzer::raw());
     for (id, text) in corpus.iter().enumerate() {
         index.add(format!("doc-{id}"), format!("Document {id}"), text);
     }
     index.finish();
-    index
+    IndexSource::from(index)
 }
 
 fn indexing(c: &mut Criterion) {

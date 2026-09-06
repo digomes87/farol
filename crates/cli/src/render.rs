@@ -130,6 +130,14 @@ pub fn results_json(
 pub fn stats(stats: &Stats, path: &str, style: &Style) -> String {
     let rows = [
         ("index", path.to_string()),
+        (
+            "storage",
+            if stats.mapped {
+                "memory-mapped (read in place)".to_string()
+            } else {
+                "in memory".to_string()
+            },
+        ),
         ("documents", stats.documents.to_string()),
         ("vocabulary", format!("{} terms", stats.vocabulary)),
         ("postings", stats.postings.to_string()),

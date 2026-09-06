@@ -19,6 +19,22 @@ use farol_core::{Analyzer, Bm25, Engine, Highlighter};
 
 use crate::render::Style;
 
+/// Writes `text` to stdout, treating a closed pipe as a normal end.
+///
+/// Rust ignores `SIGPIPE`, so `farol search … | head -3` would otherwise make
+/// the process panic when `head` exits — a crash report for something the user
+/// asked for.
+fn emit(text: &str) -> Result<()> {
+    let mut stdout = io::stdout();
+    match stdout
+        .write_all(text.as_bytes())
+        .and_then(|()| stdout.flush())
+    {
+        Err(error) if error.kind() == io::ErrorKind::BrokenPipe => Ok(()),
+        other => Ok(other?),
+    }
+}
+
 /// Default location of the index file, relative to the working directory.
 const DEFAULT_INDEX: &str = "farol.idx";
 
@@ -51,6 +67,9 @@ enum Command {
         /// Keeps stopwords in the index.
         #[arg(long)]
         keep_stopwords: bool,
+        /// Writes the serialised format instead of the memory-mapped one.
+        #[arg(long)]
+        serialized: bool,
     },
     /// Searches the index and prints the best results.
     Search {
@@ -114,7 +133,15 @@ fn main() -> Result<()> {
             ext,
             no_stemming,
             keep_stopwords,
-        } => build_index(path, index.file, ext, no_stemming, keep_stopwords),
+            serialized,
+        } => build_index(
+            path,
+            index.file,
+            ext,
+            no_stemming,
+            keep_stopwords,
+            serialized,
+        ),
         Command::Search {
             query,
             index,
@@ -147,6 +174,7 @@ fn build_index(
     ext: Option<Vec<String>>,
     no_stemming: bool,
     keep_stopwords: bool,
+    serialized: bool,
 ) -> Result<()> {
     let mut engine = Engine::new(analyzer(no_stemming, keep_stopwords));
     if let Some(ext) = ext {
@@ -157,22 +185,25 @@ fn build_index(
     let count = engine
         .index_dir(&path)
         .with_context(|| format!("indexing `{}`", path.display()))?;
-    engine
-        .save(&index_path)
-        .with_context(|| format!("writing `{}`", index_path.display()))?;
+    if serialized {
+        engine.save_serialized(&index_path)
+    } else {
+        engine.save(&index_path)
+    }
+    .with_context(|| format!("writing `{}`", index_path.display()))?;
 
     let style = Style::detect(None);
-    println!(
-        "{} document(s) indexed in {:.2}s → {}",
+    emit(&format!(
+        "{} document(s) indexed in {:.2}s → {}\n",
         count,
         started.elapsed().as_secs_f64(),
         style.cyan(&index_path.display().to_string())
-    );
-    print!(
-        "{}",
-        render::stats(&engine.stats(), &index_path.display().to_string(), &style)
-    );
-    Ok(())
+    ))?;
+    emit(&render::stats(
+        &engine.stats(),
+        &index_path.display().to_string(),
+        &style,
+    ))
 }
 
 /// Loads the index and applies the ranking flags to the engine.
@@ -210,15 +241,13 @@ fn search(
     let elapsed = started.elapsed().as_secs_f64() * 1_000.0;
 
     if json {
-        println!(
-            "{}",
-            render::results_json(&results, &query, elapsed, &stats)
-        );
+        emit(&render::results_json(&results, &query, elapsed, &stats))?;
+        emit("\n")?;
     } else {
         if explain {
-            print!("{}", render::explain(&stats, &style));
+            emit(&render::explain(&stats, &style))?;
         }
-        print!("{}", render::results(&results, &query, elapsed, &style));
+        emit(&render::results(&results, &query, elapsed, &style))?;
     }
     Ok(())
 }
@@ -226,11 +255,11 @@ fn search(
 fn repl(index_path: PathBuf, ranking: Ranking, limit: usize) -> Result<()> {
     let style = Style::detect(None);
     let engine = open(&index_path, ranking, &style)?;
-    println!(
-        "{}\n{}",
+    emit(&format!(
+        "{}\n{}\n",
         style.bold("farol repl"),
         style.dim("type a query, or Ctrl-D to quit")
-    );
+    ))?;
 
     let stdin = io::stdin();
     let mut lines = stdin.lock().lines();
@@ -250,13 +279,12 @@ fn repl(index_path: PathBuf, ranking: Ranking, limit: usize) -> Result<()> {
         match engine.search(query, limit) {
             Ok(results) => {
                 let elapsed = started.elapsed().as_secs_f64() * 1_000.0;
-                print!("{}", render::results(&results, query, elapsed, &style));
+                emit(&render::results(&results, query, elapsed, &style))?;
             }
-            Err(err) => println!("{}", style.yellow(&format!("error: {err}"))),
+            Err(err) => emit(&format!("{}\n", style.yellow(&format!("error: {err}"))))?,
         }
     }
-    println!();
-    Ok(())
+    emit("\n")
 }
 
 fn stats(index_path: PathBuf) -> Result<()> {
@@ -265,9 +293,9 @@ fn stats(index_path: PathBuf) -> Result<()> {
     engine
         .load(&index_path)
         .with_context(|| format!("opening `{}`", index_path.display()))?;
-    print!(
-        "{}",
-        render::stats(&engine.stats(), &index_path.display().to_string(), &style)
-    );
-    Ok(())
+    emit(&render::stats(
+        &engine.stats(),
+        &index_path.display().to_string(),
+        &style,
+    ))
 }

@@ -146,7 +146,8 @@ mod tests {
 
         let index = load(&path, Analyzer::default()).unwrap();
         let query = Query::parse("collector", index.analyzer()).unwrap();
-        assert_eq!(Searcher::new(&index).search(&query, 10).len(), 2);
+        let source = crate::source::IndexSource::from(index);
+        assert_eq!(Searcher::new(&source).search(&query, 10).len(), 2);
     }
 
     #[test]
