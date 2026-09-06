@@ -8,6 +8,7 @@
 //! | [`index`] | terms → posting lists (the inverted index) |
 //! | [`bm25`] | posting lists → relevance scores |
 //! | [`query`] | query string → boolean clauses |
+//! | [`codec`] | delta + varint compression of posting lists |
 //! | [`cursor`] | skip-capable iteration over a posting list |
 //! | [`topk`] | bounded collector for the best k hits |
 //! | [`searcher`] | clauses + index → ranked hits |
@@ -18,6 +19,7 @@
 
 pub mod analyzer;
 pub mod bm25;
+pub mod codec;
 pub mod cursor;
 pub mod engine;
 pub mod error;
