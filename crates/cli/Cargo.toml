@@ -1,0 +1,18 @@
+[package]
+name = "farol-cli"
+description = "Command line interface for the farol search engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "farol"
+path = "src/main.rs"
+
+[dependencies]
+farol-core = { path = "../core" }
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
