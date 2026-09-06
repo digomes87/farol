@@ -64,6 +64,6 @@ jobs:
       - name: Check the unsafe code for UB
         # Covers the raw reference-count manipulation in the snapshot cell and
         # the byte-level decoding in the codec and the index.
-        run: cargo miri test -p farol-core --lib -- snapshot:: codec:: index::
+        run: "cargo miri test -p farol-core --lib -- snapshot:: codec:: index::"
         env:
           MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance
