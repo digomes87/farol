@@ -241,8 +241,7 @@ mod tests {
             let text = if id % step == 0 { "rust" } else { "other" };
             index.add(format!("d{id}"), "D", text);
         }
-        index.finish();
-        index
+        index.seal()
     }
 
     fn cursor(index: &Index) -> BlockCursor<'_> {
@@ -341,7 +340,7 @@ mod tests {
             index.add(format!("d{id}"), "D", "rust padding padding padding");
         }
         index.add("hot", "Hot", "rust rust rust");
-        index.finish();
+        let index = index.seal();
 
         let mut cursor = cursor(&index);
         let term_bound = cursor.term_upper_bound();

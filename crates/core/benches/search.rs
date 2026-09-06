@@ -51,8 +51,7 @@ fn build(corpus: &[String]) -> IndexSource {
     for (id, text) in corpus.iter().enumerate() {
         index.add(format!("doc-{id}"), format!("Document {id}"), text);
     }
-    index.finish();
-    IndexSource::from(index)
+    IndexSource::from(index.seal())
 }
 
 fn indexing(c: &mut Criterion) {

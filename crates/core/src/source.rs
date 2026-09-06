@@ -6,9 +6,11 @@
 //! an enum rather than a trait: there are exactly two cases, they are known
 //! here, and dispatch stays a match instead of a virtual call on the hot path.
 
+use std::ops::{Deref, DerefMut};
+
 use crate::analyzer::Analyzer;
 use crate::error::{Error, Result};
-use crate::index::{DocId, DocumentRef, Index, Posting, TermRef};
+use crate::index::{Building, DocId, DocumentRef, Index, Posting, TermRef};
 use crate::mmap::MappedIndex;
 
 /// An index the engine can search.
@@ -48,19 +50,32 @@ impl IndexSource {
         }
     }
 
-    /// The writable index behind this source, if there is one.
+    /// Opens an editing session over the in-memory index.
     ///
     /// A mapped index is read-only: adding to it would mean writing through the
-    /// mapping, and the whole point of the format is that it is laid out for
-    /// reading. Callers that need to index get an error naming the reason.
-    pub fn as_memory_mut(&mut self) -> Result<&mut Index> {
-        match self {
-            Self::Memory(index) => Ok(index),
-            Self::Mapped(index) => Err(Error::Query(format!(
+    /// mapping, and the whole point of that format is that it is laid out for
+    /// reading. Callers that need to index get an error naming the reason —
+    /// raised *before* anything is moved out of `self`, so a failed edit leaves
+    /// the source exactly as it was.
+    ///
+    /// The returned [`Edit`] seals the index and puts it back when it is
+    /// dropped, including on an early return through `?`. There is no code path
+    /// that leaves a source holding a half-built index, because there is no
+    /// code path that skips a destructor.
+    pub fn edit(&mut self) -> Result<Edit<'_>> {
+        if let Self::Mapped(index) = self {
+            return Err(Error::Query(format!(
                 "`{}` is a memory-mapped index and is read-only; rebuild it with `farol index`",
                 index.path().display()
-            ))),
+            )));
         }
+        let Self::Memory(index) = std::mem::take(self) else {
+            unreachable!("the mapped case returned above");
+        };
+        Ok(Edit {
+            source: self,
+            index: Some(index.edit()),
+        })
     }
 
     pub fn is_mapped(&self) -> bool {
@@ -140,17 +155,57 @@ impl IndexSource {
     }
 }
 
+/// An editing session over an [`IndexSource`].
+///
+/// Derefs to the index being built, and on drop seals it and writes it back to
+/// the source it came from.
+#[derive(Debug)]
+pub struct Edit<'a> {
+    source: &'a mut IndexSource,
+    /// `Some` until the session ends; the `Option` exists only so `Drop` can
+    /// move the index out without leaving anything invalid behind.
+    index: Option<Index<Building>>,
+}
+
+impl Edit<'_> {
+    /// Ends the session explicitly. Equivalent to dropping it, and clearer at a
+    /// call site where the sealing matters.
+    pub fn commit(self) {}
+}
+
+impl Deref for Edit<'_> {
+    type Target = Index<Building>;
+
+    fn deref(&self) -> &Self::Target {
+        self.index.as_ref().expect("index is taken only on drop")
+    }
+}
+
+impl DerefMut for Edit<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.index.as_mut().expect("index is taken only on drop")
+    }
+}
+
+impl Drop for Edit<'_> {
+    fn drop(&mut self) {
+        if let Some(index) = self.index.take() {
+            *self.source = IndexSource::Memory(index.seal());
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::index::Sealed;
     use crate::mmap;
 
-    fn built() -> Index {
+    fn built() -> Index<Sealed> {
         let mut index = Index::new(Analyzer::raw());
         index.add("a", "A", "rust is fast and safe");
         index.add("b", "B", "rust ranks documents by relevance");
-        index.finish();
-        index
+        index.seal()
     }
 
     #[test]
@@ -184,16 +239,35 @@ mod tests {
         mmap::write(&built(), &path).unwrap();
 
         let mut mapped = IndexSource::from(MappedIndex::open(&path, Analyzer::raw()).unwrap());
-        let err = mapped.as_memory_mut().unwrap_err();
+        let err = mapped.edit().unwrap_err();
         assert!(err.to_string().contains("read-only"), "{err}");
-        assert!(mapped.is_mapped());
+        assert!(
+            mapped.is_mapped(),
+            "a failed edit must leave the source intact"
+        );
+        assert_eq!(mapped.len(), 2);
     }
 
     #[test]
     fn a_memory_source_can_still_be_extended() {
         let mut memory = IndexSource::from(built());
-        memory.as_memory_mut().unwrap().add("c", "C", "more rust");
-        memory.as_memory_mut().unwrap().finish();
-        assert_eq!(memory.len(), 3);
+        memory.edit().unwrap().add("c", "C", "more rust");
+        assert_eq!(memory.len(), 3, "dropping the session seals it back");
+        assert_eq!(memory.doc_freq("rust"), 3);
+    }
+
+    #[test]
+    fn an_edit_is_sealed_back_even_when_the_caller_returns_early() {
+        fn edit_then_fail(source: &mut IndexSource) -> Result<()> {
+            let mut edit = source.edit()?;
+            edit.add("c", "C", "more rust");
+            // Something goes wrong halfway through the update.
+            Err(Error::Query("boom".into()))
+        }
+
+        let mut memory = IndexSource::from(built());
+        assert!(edit_then_fail(&mut memory).is_err());
+        assert_eq!(memory.len(), 3, "the session must still have been sealed");
+        assert!(memory.term("rust").is_some(), "and the index is searchable");
     }
 }

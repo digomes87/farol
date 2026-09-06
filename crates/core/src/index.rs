@@ -14,6 +14,7 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
 
@@ -320,6 +321,61 @@ fn decode_block(bytes: &[u8], count: usize) -> Vec<Posting> {
     out
 }
 
+/// Type-level states an [`Index`] can be in.
+///
+/// An index that is still accepting documents cannot answer queries: its
+/// postings are staged uncompressed, unsorted, and without score bounds. That
+/// used to be a runtime rule — "remember to call `finish()`" — and runtime rules
+/// get forgotten, which is how a doc example once asserted a document frequency
+/// of zero on a perfectly good index.
+///
+/// The state is now part of the type, so the rule is checked by the compiler:
+/// [`Building`] has `add`/`merge` and no readers, [`Sealed`] has readers and no
+/// writers, and the only way between them is [`Index::seal`] and
+/// [`Index::edit`], which consume the index and hand back the other state.
+///
+/// ```compile_fail
+/// # use farol_core::{Analyzer, Index};
+/// let mut index = Index::new(Analyzer::default());
+/// index.add("a", "A", "rust");
+/// // error: no method named `doc_freq` on `Index<Building>`
+/// let _ = index.doc_freq("rust");
+/// ```
+///
+/// ```compile_fail
+/// # use farol_core::{Analyzer, Index};
+/// let index = Index::new(Analyzer::default()).seal();
+/// // error: no method named `add` on `Index<Sealed>`
+/// index.add("a", "A", "rust");
+/// ```
+pub mod state {
+    /// Accepting documents; postings are staged and unreadable.
+    #[derive(Debug, Clone, Copy, Default)]
+    pub struct Building;
+
+    /// Compressed, sorted and searchable; no longer writable.
+    #[derive(Debug, Clone, Copy, Default)]
+    pub struct Sealed;
+
+    /// Implemented only by [`Building`] and [`Sealed`].
+    ///
+    /// The supertrait lives in a private module, so no crate outside this one
+    /// can add a third state and break the guarantee that a sealed index has
+    /// been through `seal()`.
+    pub trait State: private::Sealed {}
+
+    impl State for Building {}
+    impl State for Sealed {}
+
+    mod private {
+        pub trait Sealed {}
+        impl Sealed for super::Building {}
+        impl Sealed for super::Sealed {}
+    }
+}
+
+pub use state::{Building, Sealed, State};
+
 /// An in-memory inverted index.
 ///
 /// # Example
@@ -329,37 +385,39 @@ fn decode_block(bytes: &[u8], count: usize) -> Vec<Posting> {
 ///
 /// let mut index = Index::new(Analyzer::default());
 /// index.add("doc-1", "Ferris the crab", "The crab named Ferris learns Rust");
-/// index.finish(); // compresses the postings and computes the score bounds
 ///
+/// // `seal` compresses the postings and returns the searchable state; the
+/// // reader methods below do not exist before this line.
+/// let index = index.seal();
 /// assert_eq!(index.len(), 1);
 /// assert_eq!(index.doc_freq("rust"), 1);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Index {
+#[serde(bound = "")]
+pub struct Index<S: State = Sealed> {
     postings: HashMap<String, TermIndex>,
     docs: Vec<Document>,
     total_length: u64,
     #[serde(skip)]
     analyzer: Option<Analyzer>,
+    /// Zero-sized: the state exists only at compile time.
+    #[serde(skip)]
+    _state: PhantomData<S>,
 }
 
-impl Default for Index {
+impl<S: State> Default for Index<S> {
     fn default() -> Self {
-        Self::new(Analyzer::default())
-    }
-}
-
-impl Index {
-    /// Creates an empty index that will analyze text with `analyzer`.
-    pub fn new(analyzer: Analyzer) -> Self {
         Self {
             postings: HashMap::new(),
             docs: Vec::new(),
             total_length: 0,
-            analyzer: Some(analyzer),
+            analyzer: Some(Analyzer::default()),
+            _state: PhantomData,
         }
     }
+}
 
+impl<S: State> Index<S> {
     /// The analyzer used for indexing; queries must go through the same one.
     pub fn analyzer(&self) -> &Analyzer {
         self.analyzer.as_ref().expect("analyzer is always set")
@@ -369,6 +427,46 @@ impl Index {
     /// stopword configuration (see [`crate::store`]).
     pub(crate) fn set_analyzer(&mut self, analyzer: Analyzer) {
         self.analyzer = Some(analyzer);
+    }
+
+    /// All indexed documents, in insertion order.
+    pub fn documents(&self) -> &[Document] {
+        &self.docs
+    }
+
+    /// Number of indexed documents.
+    pub fn len(&self) -> usize {
+        self.docs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.docs.is_empty()
+    }
+
+    /// Sum of every document length, in terms.
+    pub fn total_length(&self) -> u64 {
+        self.total_length
+    }
+
+    /// Mean document length in terms, used by the BM25 length normalisation.
+    pub fn avg_doc_len(&self) -> f32 {
+        if self.docs.is_empty() {
+            return 0.0;
+        }
+        self.total_length as f32 / self.docs.len() as f32
+    }
+}
+
+impl Index<Building> {
+    /// Creates an empty index that will analyze text with `analyzer`.
+    pub fn new(analyzer: Analyzer) -> Self {
+        Self {
+            postings: HashMap::new(),
+            docs: Vec::new(),
+            total_length: 0,
+            analyzer: Some(analyzer),
+            _state: PhantomData,
+        }
     }
 
     /// Analyzes `text` and adds it as a new document, returning its id.
@@ -408,7 +506,7 @@ impl Index {
     ///
     /// This is what makes parallel indexing possible: each worker builds an
     /// independent shard and the shards are folded together at the end.
-    pub fn merge(&mut self, other: Index) {
+    pub fn merge(&mut self, other: Index<Building>) {
         let offset = self.docs.len() as DocId;
         for (term, term_index) in other.postings {
             let entry = self.postings.entry(term).or_default();
@@ -428,15 +526,45 @@ impl Index {
         self.total_length += other.total_length;
     }
 
-    /// Compresses every posting list and refreshes the score bounds.
-    ///
-    /// Callers must run this after [`merge`](Index::merge) and before any
-    /// search: postings only exist in their compressed, sorted form afterwards,
-    /// and both phrase matching and pruning depend on that order.
-    pub fn finish(&mut self) {
+    /// Compresses every posting list and computes the score bounds.
+    fn compress(&mut self) {
         let lengths: Vec<u32> = self.docs.iter().map(|d| d.length).collect();
         for term_index in self.postings.values_mut() {
             term_index.compress(&lengths);
+        }
+    }
+
+    /// Compresses the staged postings and returns a searchable index.
+    ///
+    /// Consuming `self` is the point: after sealing there is no longer a value
+    /// of the writable type around, so no code can add a document to an index
+    /// something else is already searching.
+    pub fn seal(mut self) -> Index<Sealed> {
+        self.compress();
+        Index {
+            postings: self.postings,
+            docs: self.docs,
+            total_length: self.total_length,
+            analyzer: self.analyzer,
+            _state: PhantomData,
+        }
+    }
+}
+
+impl Index<Sealed> {
+    /// Reopens a sealed index for writing.
+    ///
+    /// The compressed postings are kept and decoded back into staging the next
+    /// time the index is sealed, so this is not a rebuild — but it does consume
+    /// the searchable index, which is what prevents a half-updated index from
+    /// being queried.
+    pub fn edit(self) -> Index<Building> {
+        Index {
+            postings: self.postings,
+            docs: self.docs,
+            total_length: self.total_length,
+            analyzer: self.analyzer,
+            _state: PhantomData,
         }
     }
 
@@ -470,41 +598,14 @@ impl Index {
         })
     }
 
-    /// All indexed documents, in insertion order.
-    pub fn documents(&self) -> &[Document] {
-        &self.docs
-    }
-
-    /// Number of indexed documents.
-    pub fn len(&self) -> usize {
-        self.docs.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.docs.is_empty()
-    }
-
     /// Every term in the vocabulary, in arbitrary order.
     pub fn terms(&self) -> impl Iterator<Item = &str> {
         self.postings.keys().map(String::as_str)
     }
 
-    /// Sum of every document length, in terms.
-    pub fn total_length(&self) -> u64 {
-        self.total_length
-    }
-
     /// Number of distinct terms in the vocabulary.
     pub fn vocabulary_size(&self) -> usize {
         self.postings.len()
-    }
-
-    /// Mean document length in terms, used by the BM25 length normalisation.
-    pub fn avg_doc_len(&self) -> f32 {
-        if self.docs.is_empty() {
-            return 0.0;
-        }
-        self.total_length as f32 / self.docs.len() as f32
     }
 
     /// Total number of postings, i.e. the size of the index in entries.
@@ -529,8 +630,7 @@ mod tests {
         let mut index = Index::new(Analyzer::raw());
         index.add("a", "A", "rust is fast rust is safe");
         index.add("b", "B", "search engines rank documents");
-        index.finish();
-        index
+        index.seal()
     }
 
     #[test]
@@ -563,7 +663,7 @@ mod tests {
         let mut index = Index::new(Analyzer::raw());
         index.add("a", "A", "rust is fast rust is safe");
         index.add("b", "B", "rust ranks documents");
-        index.finish();
+        let index = index.seal();
 
         let postings = index.postings("rust").unwrap();
         assert_eq!(postings.len(), 2);
@@ -579,7 +679,7 @@ mod tests {
         for id in 0..(BLOCK_SIZE * 2 + 5) {
             index.add(format!("d{id}"), "D", "rust");
         }
-        index.finish();
+        let index = index.seal();
 
         let term = index.term("rust").unwrap();
         assert_eq!(term.blocks().len(), 3, "two full blocks and a partial one");
@@ -602,7 +702,7 @@ mod tests {
         // A second block where the term is much stronger: high frequency in a
         // short document.
         index.add("hot", "Hot", "rust rust rust");
-        index.finish();
+        let index = index.seal();
 
         let term = index.term("rust").unwrap();
         assert_eq!(term.blocks().len(), 2);
@@ -619,7 +719,7 @@ mod tests {
         for id in 0..2_000 {
             index.add(format!("d{id}"), "D", "rust");
         }
-        index.finish();
+        let index = index.seal();
 
         let uncompressed = 2_000 * (std::mem::size_of::<DocId>() + std::mem::size_of::<u32>() * 2);
         assert!(
@@ -630,12 +730,16 @@ mod tests {
     }
 
     #[test]
-    fn adding_documents_to_a_finished_index_keeps_the_earlier_postings() {
+    fn reopening_a_sealed_index_keeps_the_earlier_postings() {
         let mut index = Index::new(Analyzer::raw());
         index.add("a", "A", "rust");
-        index.finish();
+        let index = index.seal();
+
+        // Sealing is not final: `edit` hands the index back for writing, and
+        // the compressed postings are decoded into staging on the next seal.
+        let mut index = index.edit();
         index.add("b", "B", "rust");
-        index.finish();
+        let index = index.seal();
 
         assert_eq!(index.doc_freq("rust"), 2);
         let docs: Vec<_> = index
@@ -652,7 +756,7 @@ mod tests {
         let mut index = Index::new(Analyzer::raw());
         index.add("a", "A", "rust rust rust padding padding padding");
         index.add("b", "B", "rust");
-        index.finish();
+        let index = index.seal();
 
         let term = index.term("rust").unwrap();
         assert_eq!(term.max_tf(), 3, "highest frequency across postings");
@@ -663,13 +767,14 @@ mod tests {
     fn score_bounds_are_refreshed_after_a_merge() {
         let mut left = Index::new(Analyzer::raw());
         left.add("a", "A", "rust padding padding");
-        left.finish();
+        let left = left.seal();
         assert_eq!(left.term("rust").unwrap().max_tf(), 1);
 
         let mut right = Index::new(Analyzer::raw());
         right.add("b", "B", "rust rust");
+        let mut left = left.edit();
         left.merge(right);
-        left.finish();
+        let left = left.seal();
 
         assert_eq!(left.term("rust").unwrap().max_tf(), 2);
         assert_eq!(left.term("rust").unwrap().min_len(), 2);
@@ -683,7 +788,7 @@ mod tests {
         right.add("b", "B", "rust");
 
         left.merge(right);
-        left.finish();
+        let left = left.seal();
 
         assert_eq!(left.len(), 2);
         assert_eq!(left.document(1).unwrap().uri, "b");
@@ -705,7 +810,7 @@ mod tests {
         // Merge in reverse: the shard's document lands before the local one.
         let mut merged = other;
         merged.merge(index);
-        merged.finish();
+        let merged = merged.seal();
         let docs: Vec<_> = merged
             .postings("x")
             .unwrap()

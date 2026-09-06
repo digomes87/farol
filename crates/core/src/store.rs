@@ -121,8 +121,7 @@ mod tests {
             "rust gives memory safety without a collector",
         );
         index.add("b.txt", "Go", "go gives goroutines and a garbage collector");
-        index.finish();
-        index
+        index.seal()
     }
 
     #[test]
@@ -156,7 +155,7 @@ mod tests {
         let path = dir.path().join("corpus.farol");
 
         save(&sample(), &path).unwrap();
-        save(&Index::new(Analyzer::default()), &path).unwrap();
+        save(&Index::new(Analyzer::default()).seal(), &path).unwrap();
 
         assert!(load(&path, Analyzer::default()).unwrap().is_empty());
         let leftovers: Vec<_> = fs::read_dir(dir.path())

@@ -20,7 +20,7 @@ use rayon::prelude::*;
 use crate::analyzer::Analyzer;
 use crate::bm25::Bm25;
 use crate::error::{Error, Result};
-use crate::index::Index;
+use crate::index::{Building, Index};
 use crate::mmap::{self, MappedIndex};
 use crate::query::Query;
 use crate::searcher::{SearchStats, Searcher};
@@ -83,7 +83,7 @@ impl Engine {
     /// Creates an empty engine using `analyzer` for both indexing and querying.
     pub fn new(analyzer: Analyzer) -> Self {
         Self {
-            index: IndexSource::from(Index::new(analyzer)),
+            index: IndexSource::from(Index::new(analyzer).seal()),
             bm25: Bm25::default(),
             highlighter: Highlighter::default(),
             extensions: DEFAULT_EXTENSIONS.iter().map(|e| e.to_string()).collect(),
@@ -127,9 +127,7 @@ impl Engine {
         title: impl Into<String>,
         text: &str,
     ) -> Result<()> {
-        let index = self.index.as_memory_mut()?;
-        index.add(uri, title, text);
-        index.finish();
+        self.index.edit()?.add(uri, title, text);
         Ok(())
     }
 
@@ -149,9 +147,9 @@ impl Engine {
         let files = self.collect_files(root.as_ref())?;
         let analyzer = self.index.analyzer().clone();
         // Fail before doing any work if this engine cannot be written to.
-        self.index.as_memory_mut()?;
+        drop(self.index.edit()?);
 
-        let shards: Vec<Index> = files
+        let shards: Vec<Index<Building>> = files
             .par_chunks(INDEX_CHUNK)
             .map(|chunk| {
                 let mut shard = Index::new(analyzer.clone());
@@ -167,11 +165,13 @@ impl Engine {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let index = self.index.as_memory_mut()?;
+        let mut edit = self.index.edit()?;
         for shard in shards {
-            index.merge(shard);
+            edit.merge(shard);
         }
-        index.finish();
+        // Dropping the session compresses the merged postings once, rather than
+        // once per shard.
+        edit.commit();
         Ok(files.len())
     }
 

@@ -458,8 +458,7 @@ mod tests {
             "rust is a great language to write a search engine",
         );
         index.add("d3", "Java", "java is a language with a virtual machine");
-        index.finish();
-        IndexSource::from(index)
+        IndexSource::from(index.seal())
     }
 
     fn run(input: &str, limit: usize) -> Vec<(String, f32)> {
@@ -566,8 +565,7 @@ mod tests {
             }
             index.add(format!("d{id}"), format!("Doc {id}"), &text);
         }
-        index.finish();
-        IndexSource::from(index)
+        IndexSource::from(index.seal())
     }
 
     #[test]

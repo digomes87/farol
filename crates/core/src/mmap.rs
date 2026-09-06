@@ -407,8 +407,7 @@ mod tests {
         );
         index.add("b.txt", "Go", "go gives goroutines and a garbage collector");
         index.add("c.txt", "Zig", "zig gives manual memory management");
-        index.finish();
-        index
+        index.seal()
     }
 
     fn mapped(index: &Index, dir: &Path) -> MappedIndex {
@@ -483,7 +482,7 @@ mod tests {
         for id in 0..500 {
             index.add(format!("d{id}"), "D", &format!("term{id} shared"));
         }
-        index.finish();
+        let index = index.seal();
         let mapped = mapped(&index, dir.path());
 
         for id in 0..500 {
@@ -531,7 +530,7 @@ mod tests {
     #[test]
     fn an_empty_index_maps_cleanly() {
         let dir = tempfile::tempdir().unwrap();
-        let mapped = mapped(&Index::new(Analyzer::raw()), dir.path());
+        let mapped = mapped(&Index::new(Analyzer::raw()).seal(), dir.path());
         assert!(mapped.is_empty());
         assert_eq!(mapped.avg_doc_len(), 0.0);
         assert!(mapped.term("anything").is_none());
