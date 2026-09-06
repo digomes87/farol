@@ -37,11 +37,11 @@ fn every_corpus_document_is_indexed() {
 fn queries_land_on_the_document_that_covers_the_topic() {
     let engine = engine();
     let expectations = [
-        ("saturação da frequência", "ranqueamento-bm25.md"),
-        ("stopwords stemming", "analise-de-texto.md"),
-        ("renomeação atômica", "armazenamento.md"),
-        ("deslocamento relativo", "frases-e-posicoes.md"),
-        ("janela de termos distintos", "trechos-destacados.md"),
+        ("frequency saturation", "bm25-ranking.md"),
+        ("stopwords stemming", "text-analysis.md"),
+        ("atomic rename", "storage.md"),
+        ("relative offset", "phrases-and-positions.md"),
+        ("window of distinct terms", "highlighted-snippets.md"),
     ];
     for (query, expected) in expectations {
         let uri = top(&engine, query);
@@ -55,20 +55,25 @@ fn queries_land_on_the_document_that_covers_the_topic() {
 #[test]
 fn accents_and_inflections_do_not_change_the_answer() {
     let engine = engine();
-    // Same question, four spellings: accented, unaccented, plural, uppercase.
-    let variants = ["posições", "posicoes", "posição", "POSIÇÕES"];
-    let answers: Vec<_> = variants.iter().map(|q| top(&engine, q)).collect();
+    // Same word, four spellings: accented, unaccented, and both in upper case.
+    let spellings = ["ação", "acao", "AÇÃO", "ACAO"];
+    let answers: Vec<_> = spellings.iter().map(|q| top(&engine, q)).collect();
     assert!(
         answers.windows(2).all(|w| w[0] == w[1]),
         "spelling changed the ranking: {answers:?}"
     );
+
+    // Singular and plural must stem to the same term.
+    let singular = top(&engine, "position");
+    let plural = top(&engine, "positions");
+    assert_eq!(singular, plural);
 }
 
 #[test]
 fn a_phrase_is_stricter_than_the_same_words_loose() {
     let engine = engine();
-    let loose = engine.search("lista de postings", 10).unwrap();
-    let phrase = engine.search("\"lista de postings\"", 10).unwrap();
+    let loose = engine.search("posting list", 10).unwrap();
+    let phrase = engine.search("\"posting list\"", 10).unwrap();
     assert!(
         phrase.len() < loose.len(),
         "the phrase matched as many documents as the loose terms"
@@ -79,11 +84,11 @@ fn a_phrase_is_stricter_than_the_same_words_loose() {
 #[test]
 fn required_and_excluded_clauses_reshape_the_result_set() {
     let engine = engine();
-    let all = engine.search("indice", 10).unwrap().len();
-    let excluded = engine.search("indice -postings", 10).unwrap().len();
+    let all = engine.search("index", 10).unwrap().len();
+    let excluded = engine.search("index -postings", 10).unwrap().len();
     assert!(excluded < all, "the exclusion removed nothing");
 
-    let required = engine.search("+postings +frase", 10).unwrap();
+    let required = engine.search("+postings +phrase", 10).unwrap();
     assert!(required
         .iter()
         .all(|r| r.uri.ends_with(".md") && r.score > 0.0));
@@ -93,19 +98,25 @@ fn required_and_excluded_clauses_reshape_the_result_set() {
 fn results_carry_a_snippet_that_shows_the_match() {
     let engine = engine();
     let results = engine.search("stemming", 3).unwrap();
-    assert!(results[0].snippet.contains("**stemming**"));
+    // The snippet quotes the source verbatim, so the marked word keeps its
+    // original casing.
+    assert!(
+        results[0].snippet.contains("**Stemming**"),
+        "{}",
+        results[0].snippet
+    );
 }
 
 #[test]
 fn ranking_is_stable_across_runs() {
     let first: Vec<_> = engine()
-        .search("indice termos documento", 5)
+        .search("index terms document", 5)
         .unwrap()
         .into_iter()
         .map(|r| r.uri)
         .collect();
     let second: Vec<_> = engine()
-        .search("indice termos documento", 5)
+        .search("index terms document", 5)
         .unwrap()
         .into_iter()
         .map(|r| r.uri)

@@ -34,12 +34,12 @@ fn index_then_search_then_stats() {
     let search = farol(&["search", "stemming", "-i", &index, "-n", "3"]);
     assert!(search.status.success());
     let text = stdout(&search);
-    assert!(text.contains("analise-de-texto.md"), "{text}");
+    assert!(text.contains("text-analysis.md"), "{text}");
     // Piped output must be plain: no ANSI escapes.
     assert!(!text.contains('\x1b'), "piped output was colored");
 
     let stats = farol(&["stats", "-i", &index]);
-    assert!(stdout(&stats).contains("documentos"));
+    assert!(stdout(&stats).contains("documents"));
 }
 
 #[test]
@@ -47,7 +47,7 @@ fn json_output_is_machine_readable() {
     let dir = tempfile::tempdir().unwrap();
     let index = indexed(dir.path());
 
-    let output = farol(&["search", "+posicoes", "-i", &index, "--json"]);
+    let output = farol(&["search", "+positions", "-i", &index, "--json"]);
     let parsed: serde_json::Value = serde_json::from_str(&stdout(&output)).expect("valid JSON");
     assert!(parsed["count"].as_u64().unwrap() >= 1);
     assert!(parsed["results"][0]["uri"].is_string());
@@ -58,8 +58,8 @@ fn ranking_parameters_are_wired_through() {
     let dir = tempfile::tempdir().unwrap();
     let index = indexed(dir.path());
 
-    let default = farol(&["search", "indice", "-i", &index, "--json"]);
-    let tuned = farol(&["search", "indice", "-i", &index, "--json", "--b", "0.0"]);
+    let default = farol(&["search", "index", "-i", &index, "--json"]);
+    let tuned = farol(&["search", "index", "-i", &index, "--json", "--b", "0.0"]);
 
     let default: serde_json::Value = serde_json::from_str(&stdout(&default)).unwrap();
     let tuned: serde_json::Value = serde_json::from_str(&stdout(&tuned)).unwrap();

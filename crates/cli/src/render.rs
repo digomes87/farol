@@ -55,15 +55,12 @@ impl Style {
 /// Renders results as a human readable list.
 pub fn results(results: &[SearchResult], query: &str, elapsed_ms: f64, style: &Style) -> String {
     if results.is_empty() {
-        return format!(
-            "{}\n",
-            style.dim(&format!("nenhum resultado para `{query}`"))
-        );
+        return format!("{}\n", style.dim(&format!("no results for `{query}`")));
     }
 
     let mut out = String::new();
     out.push_str(&style.dim(&format!(
-        "{} resultado(s) em {elapsed_ms:.1} ms\n\n",
+        "{} result(s) in {elapsed_ms:.1} ms\n\n",
         results.len()
     )));
 
@@ -102,14 +99,11 @@ pub fn results_json(results: &[SearchResult], query: &str, elapsed_ms: f64) -> S
 /// Renders index level counters.
 pub fn stats(stats: &Stats, path: &str, style: &Style) -> String {
     let rows = [
-        ("índice", path.to_string()),
-        ("documentos", stats.documents.to_string()),
-        ("vocabulário", format!("{} termos", stats.vocabulary)),
+        ("index", path.to_string()),
+        ("documents", stats.documents.to_string()),
+        ("vocabulary", format!("{} terms", stats.vocabulary)),
         ("postings", stats.postings.to_string()),
-        (
-            "tamanho médio",
-            format!("{:.1} termos/doc", stats.avg_doc_len),
-        ),
+        ("avg length", format!("{:.1} terms/doc", stats.avg_doc_len)),
     ];
     rows.iter()
         .map(|(label, value)| format!("{:<16}{}\n", style.dim(label), value))
@@ -147,7 +141,7 @@ mod tests {
     fn an_empty_result_set_says_so() {
         let style = Style::detect(Some(false));
         let text = results(&[], "kubernetes", 0.4, &style);
-        assert!(text.contains("nenhum resultado"));
+        assert!(text.contains("no results"));
     }
 
     #[test]

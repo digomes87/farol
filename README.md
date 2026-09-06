@@ -1,9 +1,9 @@
 # farol
 
-Motor de busca full-text escrito em Rust, do zero — sem Lucene, sem Tantivy, sem
-dependência de busca. Analisador de texto, índice invertido posicional,
-ranqueamento BM25, consultas booleanas com frase exata e trechos destacados,
-tudo em ~2.000 linhas de Rust com testes.
+A full-text search engine written in Rust from first principles — no Lucene, no
+Tantivy, no search dependency. Text analysis, a positional inverted index, BM25
+ranking, boolean queries with exact phrases and highlighted snippets, in roughly
+2,000 lines of tested Rust.
 
 [![CI](https://github.com/digomes87/farol/actions/workflows/ci.yml/badge.svg)](https://github.com/digomes87/farol/actions/workflows/ci.yml)
 ![Rust](https://img.shields.io/badge/rust-1.75%2B-orange)
@@ -11,145 +11,145 @@ tudo em ~2.000 linhas de Rust com testes.
 
 ```console
 $ farol index ./corpus
-7 documento(s) indexado(s) em 0.01s → farol.idx
+7 document(s) indexed in 0.02s → farol.idx
 
-$ farol search '+posições "frase exata"'
-2 resultado(s) em 0.1 ms
+$ farol search '+positions "exact phrase"'
+2 result(s) in 0.1 ms
 
- 1. Frases e posições  2.713
-    corpus/frases-e-posicoes.md
-    # Frases e posições A busca por frase exata verifica adjacência. Cada termo
-    da frase tem um deslocamento relativo ao início dela…
+ 1. Phrases and positions  2.713
+    corpus/phrases-and-positions.md
+    # Phrases and positions Exact phrase search verifies adjacency. Each term of
+    the phrase carries an offset relative to its beginning…
 
- 2. Índice invertido  2.262
-    corpus/indice-invertido.md
-    …guarda também as posições de cada ocorrência. Sem elas não é possível
-    responder a uma consulta de frase exata…
+ 2. The inverted index  2.224
+    corpus/inverted-index.md
+    …stores the position of each occurrence. Without positions there is no way to
+    answer an exact phrase query…
 ```
 
-## Por que existe
+## Why it exists
 
-Busca parece simples até você tentar. Casar palavras é fácil; o difícil é
-decidir qual dos documentos que casaram é a resposta certa, e explicar isso ao
-leitor. Este projeto implementa o caminho inteiro — da normalização de acentos
-ao trecho destacado — para expor essas decisões em vez de escondê-las atrás de
-uma biblioteca.
+Search looks simple until you try. Matching words is easy; the hard part is
+deciding which of the matching documents is the right answer, and explaining
+that decision to the reader. This project implements the whole path — from
+accent folding to the highlighted excerpt — to expose those decisions instead of
+hiding them behind a library.
 
-## Instalação
+## Install
 
 ```bash
 git clone https://github.com/digomes87/farol
 cd farol
-cargo install --path crates/cli   # instala o binário `farol`
+cargo install --path crates/cli   # installs the `farol` binary
 ```
 
-Ou, sem instalar:
+Or, without installing:
 
 ```bash
 cargo run -p farol-cli --release -- search "bm25"
 ```
 
-## Uso
+## Usage
 
 ```bash
-farol index ./docs                    # indexa um diretório recursivamente
-farol index ./docs --ext md,txt       # só certas extensões
-farol index ./docs --no-stemming      # indexa as palavras como escritas
+farol index ./docs                    # index a directory recursively
+farol index ./docs --ext md,txt       # restrict to certain extensions
+farol index ./docs --no-stemming      # index words exactly as written
 
-farol search "motor de busca"         # consulta
-farol search '+rust -java' -n 20      # obrigatório e excluído, 20 resultados
-farol search 'bm25' --json | jq       # saída para outro programa
-farol search 'bm25' --k1 1.6 --b 0.3  # ajuste do ranqueamento
+farol search "search engine"          # query
+farol search '+rust -java' -n 20      # required and excluded, 20 results
+farol search 'bm25' --json | jq       # output for another program
+farol search 'bm25' --k1 1.6 --b 0.3  # tune the ranking
 
-farol repl                            # sessão interativa, índice na memória
-farol stats                           # contadores do índice
+farol repl                            # interactive session, index kept in memory
+farol stats                           # index counters
 ```
 
-### Sintaxe de consulta
+### Query syntax
 
-| Sintaxe | Significado |
-|---------|-------------|
-| `rust busca` | qualquer um dos termos casa; quem tem os dois ranqueia acima |
-| `+rust` | o documento **precisa** conter o termo |
-| `-java` | o documento **não pode** conter o termo |
-| `"motor de busca"` | as palavras precisam estar adjacentes, nessa ordem |
-| `+"motor de busca"` | …e a frase é obrigatória |
+| Syntax | Meaning |
+|--------|---------|
+| `rust search` | either term may match; documents with both rank higher |
+| `+rust` | the document **must** contain the term |
+| `-java` | the document **must not** contain the term |
+| `"search engine"` | the words must be adjacent, in this order |
+| `+"search engine"` | …and the phrase is mandatory |
 
-Consulta e documento passam pelo mesmo analisador, então `"Migrações"` encontra
-um texto que diz `migracao`.
+Queries and documents go through the same analyzer, so `"Migrações"` finds a
+text that says `migracao`.
 
-## Como funciona
+## How it works
 
 ```mermaid
 flowchart LR
-    A[texto bruto] --> B[analyzer<br/>normaliza · stopwords · stemming]
-    B --> C[(índice invertido<br/>termo → postings + posições)]
-    D[consulta] --> E[query parser<br/>cláusulas booleanas]
-    E --> F[searcher<br/>filtra · pontua BM25]
+    A[raw text] --> B[analyzer<br/>normalize · stopwords · stemming]
+    B --> C[(inverted index<br/>term → postings + positions)]
+    D[query] --> E[query parser<br/>boolean clauses]
+    E --> F[searcher<br/>filter · score with BM25]
     C --> F
-    F --> G[highlighter<br/>trecho destacado]
-    G --> H[resultados]
+    F --> G[highlighter<br/>snippet]
+    G --> H[results]
 ```
 
-Cada estágio é um módulo com uma responsabilidade só:
+Every stage is a module with a single responsibility:
 
-| Módulo | Responsabilidade |
-|--------|------------------|
-| `analyzer` | texto → termos normalizados, com posição e offset de origem |
-| `index` | termo → lista de postings ordenada, com posições e tamanho dos documentos |
-| `query` | string de consulta → cláusulas `Must` / `Should` / `MustNot` |
-| `searcher` | cláusulas + índice → documentos ranqueados |
-| `bm25` | postings → pontuação de relevância |
-| `snippet` | documento casado → trecho destacado |
-| `store` | índice ↔ arquivo único autodescritivo |
-| `engine` | fachada que amarra tudo |
+| Module | Responsibility |
+|--------|----------------|
+| `analyzer` | text → normalized terms, with position and source offset |
+| `index` | term → sorted posting list, with positions and document lengths |
+| `query` | query string → `Must` / `Should` / `MustNot` clauses |
+| `searcher` | clauses + index → ranked documents |
+| `bm25` | postings → relevance score |
+| `snippet` | matched document → highlighted excerpt |
+| `store` | index ↔ a single self-describing file |
+| `engine` | the façade tying it all together |
 
-O detalhamento das decisões de projeto está em
+The reasoning behind each design decision is in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-## Desempenho
+## Performance
 
-`cargo bench`, corpus sintético com distribuição Zipf de termos
-(5.000 documentos × 120 termos, vocabulário de 4.000), Apple M3 Max:
+`cargo bench`, synthetic corpus with a Zipf-like term distribution
+(5,000 documents × 120 terms, 4,000 term vocabulary), Apple M3 Max:
 
-| Operação | Tempo |
-|----------|-------|
-| Indexar 5.000 documentos | 110 ms |
-| Consulta de termo raro | 34 ns |
-| Consulta de termo frequente | 20 µs |
-| Dois termos opcionais (união) | 43 µs |
-| Dois termos obrigatórios (interseção) | **10 µs** |
-| Frase de dois termos | 2,4 µs |
+| Operation | Time |
+|-----------|------|
+| Index 5,000 documents | 110 ms |
+| Rare term query | 34 ns |
+| Frequent term query | 20 µs |
+| Two optional terms (union) | 43 µs |
+| Two required terms (intersection) | **10 µs** |
+| Two term phrase | 2.4 µs |
 
-A linha que importa é o par união/interseção: a mesma consulta com `+` custa
-4× menos, porque o conjunto de candidatos sai da interseção das listas
-obrigatórias e o BM25 roda sobre bem menos documentos.
+The line that matters is the union/intersection pair: the same query with `+`
+costs 4× less, because the candidate set comes from intersecting the required
+posting lists and BM25 then runs over far fewer documents.
 
-## Desenvolvimento
+## Development
 
 ```bash
-cargo test --workspace      # 87 testes: unitários, doc-tests, relevância e ponta a ponta
-cargo bench -p farol-core   # benchmarks com criterion
+cargo test --workspace      # 87 tests: unit, doc, relevance and end-to-end
+cargo bench -p farol-core   # criterion benchmarks
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all --check
 ```
 
-Os testes de [`crates/core/tests/relevance.rs`](crates/core/tests/relevance.rs)
-fixam qual documento deve ficar em primeiro lugar para consultas reais sobre o
-corpus de exemplo. Eles são a rede de proteção contra o pior tipo de regressão
-em busca: aquela em que tudo continua compilando, todos os testes unitários
-passam, e os resultados pioram.
+The tests in [`crates/core/tests/relevance.rs`](crates/core/tests/relevance.rs)
+pin which document must rank first for realistic queries over the sample corpus.
+They are the safety net against the worst kind of search regression: the one
+where everything still compiles, every unit test still passes, and the results
+quietly get worse.
 
-## Limitações conhecidas
+## Known limitations
 
-- O índice inteiro vive em memória e é reescrito a cada indexação; não há
-  atualização incremental nem exclusão de documentos.
-- O texto original é guardado dentro do índice para permitir os trechos
-  destacados, o que dobra o espaço em disco.
-- O stemmer é heurístico e cobre português e inglês; outras línguas passam
-  praticamente sem alteração.
-- Não há busca por prefixo, por campo nem tolerância a erro de digitação.
+- The whole index lives in memory and is rewritten on every indexing run; there
+  is no incremental update and no document deletion.
+- The original text is stored inside the index to support snippets, which
+  roughly doubles the size on disk.
+- The stemmer is heuristic and covers Portuguese and English; other languages
+  pass through nearly untouched.
+- There is no prefix search, no field search and no typo tolerance.
 
-## Licença
+## License
 
 MIT.
