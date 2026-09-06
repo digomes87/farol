@@ -276,6 +276,7 @@ dependencies = [
  "clap",
  "farol-core",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
