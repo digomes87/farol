@@ -191,7 +191,59 @@ Three choices keep it defensible:
   table in a `Cow`, which is what lets an in-memory index lend a slice while a
   mapped one parses and owns the same few entries.
 
-### 11. An unreadable file aborts indexing
+### 11. Illegal states are unrepresentable, not merely undocumented
+
+`finish()` used to be a rule: build the index, remember to call it, then search.
+The rule was forgotten in this repository's own doc example, which asserted a
+document frequency of zero on a perfectly good index.
+
+The state is now a type parameter — `Index<Building>` and `Index<Sealed>` — with
+`seal()`/`edit()` consuming the index to move between them, so a writable handle
+never coexists with a searchable one. The `State` trait is sealed through a
+private supertrait, so no downstream crate can add a third state and void the
+guarantee, and two `compile_fail` doc tests assert that the wrong programs do not
+build.
+
+The same reasoning produced `IndexSource::edit`, an RAII session that seals the
+index back into the source when it drops — including on an early return through
+the question-mark operator. There is no path that leaves a source holding a
+half-built index, because there is no path that skips a destructor.
+
+### 12. Publishing a new index must not stop the old one
+
+A rebuild takes minutes and a query takes microseconds, so the two cannot share
+a lock. `SearchService` builds the replacement beside the live index and
+publishes it with one pointer swap; in-flight queries hold an `Arc` to the
+generation they started with and finish against it.
+
+The primitive underneath, `SnapshotCell`, is where the real care went. Its read
+path is a pointer load followed by a reference-count bump, and the window
+between those two steps is the classic hole in every hand-rolled atomic `Arc`: a
+writer can swap and drop the last reference in between, turning the reader's
+increment into a write to freed memory.
+
+The first implementation closed that window with an atomic reader counter —
+announce, load, count, leave; reclaim when the writer observes zero. `loom`
+rejected it. The proof obligation is Dekker's, and it holds only if the pointer
+swap and the counter read participate in a single total order: true of `SeqCst`
+on real hardware, false in loom's model, which deliberately does not implement
+full `SeqCst` semantics, and — more to the point — not something a reviewer can
+verify by reading four lines.
+
+The response was to change the algorithm rather than argue for it. Readers now
+hold a shared guard across load-and-increment, and superseded values are dropped
+only by a thread holding that guard exclusively, acquired with `try_write`. The
+safety argument became one sentence: nothing is freed except under exclusive
+access. Readers still never block each other, and because reclamation only ever
+*tries*, a rebuild never blocks a query — a failed attempt just leaves the value
+retired until the next quiet moment.
+
+Both properties are checked rather than asserted: loom explores every
+interleaving of readers and writers, and the same code runs under Miri with
+strict provenance to catch undefined behaviour in the raw reference-count
+manipulation. Both run in CI.
+
+### 13. An unreadable file aborts indexing
 
 The opposite — skip and carry on — would produce a silently incomplete index. A
 search engine that lies about its coverage is worse than one that refuses to
@@ -208,6 +260,8 @@ start.
 | Skip to a document | O(blocks skipped) + O(log 128) inside the landing block |
 | Term lookup, mapped | O(log vocabulary) — binary search over the dictionary |
 | Opening an index, mapped | O(1) — one `mmap` and a header check |
+| Reading the live index | one uncontended shared guard, no writer can block it |
+| Publishing a new index | one pointer swap, independent of index size |
 | Intersection of n required terms | O(Σ df) with hash sets |
 | Phrase of n terms | O(df_rarest × n × log(tf)) — binary search per position |
 | Snippet | O(t) per displayed document |

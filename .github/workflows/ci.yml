@@ -31,3 +31,39 @@ jobs:
         run: cargo test --workspace --all-targets
       - name: Doc tests
         run: cargo test --workspace --doc
+
+  loom:
+    name: loom (concurrency model checking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: loom
+      - name: Explore every interleaving of the snapshot cell
+        # Loom re-runs each test under every thread interleaving its model
+        # permits, so a race that a stress test would hit once in a million runs
+        # fails here deterministically.
+        run: cargo test -p farol-core --lib snapshot --release
+        env:
+          RUSTFLAGS: --cfg loom
+          LOOM_MAX_PREEMPTIONS: "3"
+
+  miri:
+    name: miri (undefined behaviour)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: miri
+      - name: Check the unsafe code for UB
+        # Covers the raw reference-count manipulation in the snapshot cell and
+        # the byte-level decoding in the codec and the index.
+        run: cargo miri test -p farol-core --lib -- snapshot:: codec:: index::
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation -Zmiri-strict-provenance

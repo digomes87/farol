@@ -3,8 +3,8 @@
 A full-text search engine written in Rust from first principles — no Lucene, no
 Tantivy, no search dependency. Text analysis, a positional inverted index with
 delta+varint compressed blocks, BM25 ranking, block-max WAND dynamic pruning, a
-memory-mapped index format, boolean queries with exact phrases and highlighted
-snippets — in roughly 3,500 lines of tested Rust.
+memory-mapped index format, and live reindexing that never blocks a query — in
+roughly 4,500 lines of Rust, checked by tests, `loom` and Miri.
 
 [![CI](https://github.com/digomes87/farol/actions/workflows/ci.yml/badge.svg)](https://github.com/digomes87/farol/actions/workflows/ci.yml)
 ![Rust](https://img.shields.io/badge/rust-1.75%2B-orange)
@@ -110,6 +110,8 @@ Every stage is a module with a single responsibility:
 | `store` | index ↔ a single self-describing file |
 | `mmap` | index ↔ a file read in place, without loading it |
 | `source` | one interface over in-memory and mapped indexes |
+| `snapshot` | lock-free publication of a new index to live readers |
+| `service` | a search engine that can be rebuilt while it serves |
 | `engine` | the façade tying it all together |
 
 The reasoning behind each design decision is in
@@ -207,14 +209,72 @@ Reading picks the format from the file itself, so both keep working and no flag
 has to be remembered. A mapped index is read-only; indexing into one reports
 that rather than failing obscurely.
 
+## Rebuilding under load
+
+Reindexing is minutes of work; a query is microseconds. `SearchService` builds
+the new index beside the live one and publishes it with a single pointer swap,
+so queries are answered from the current generation throughout — including
+during the rebuild.
+
+```console
+$ farol repl --watch ./docs --every 10
+[gen 1] › goroutines
+no results for `goroutines`
+                          ← a background rebuild picks up a new document
+[gen 2] › goroutines
+ 1. Go  0.693
+    # Go go ships goroutines
+```
+
+A query that started before the swap finishes against the generation it started
+with: it holds an `Arc` to that version, so the old index stays alive exactly as
+long as someone is still reading it.
+
+The read path never takes a lock a writer can hold. The interesting part is the
+window between loading the pointer and bumping its reference count — a writer
+can swap and release the last reference in between, which is undefined
+behaviour, not merely a stale read. The first version guarded that with an
+atomic reader counter, and `loom` rejected it: the argument has the shape of
+Dekker's algorithm and holds only if the swap and the counter read share one
+total order. That is true of `SeqCst` on real hardware, but it is not something
+a reviewer can check in four lines. The argument was replaced instead of
+defended — readers hold a shared guard across load-and-increment, and superseded
+values are dropped only under `try_write`, whose success *is* the proof that no
+reader is inside. See [`crates/core/src/snapshot.rs`](crates/core/src/snapshot.rs).
+
+## Type-state
+
+An index that is still accepting documents cannot answer queries: its postings
+are staged, unsorted and without score bounds. That used to be a rule you had to
+remember, and it was forgotten at least once in this repo's own history.
+
+It is now a type parameter. `Index<Building>` has `add`/`merge` and no readers;
+`Index<Sealed>` has readers and no writers; `seal()` and `edit()` consume the
+index to move between them. Getting it wrong is a compile error, pinned by
+`compile_fail` doc tests:
+
+```rust
+let mut index = Index::new(Analyzer::default());
+index.add("a", "A", "rust");
+index.doc_freq("rust");     // error: no method `doc_freq` on Index<Building>
+```
+
 ## Development
 
 ```bash
-cargo test --workspace      # 148 tests: unit, doc, relevance and end-to-end
+cargo test --workspace      # 167 tests: unit, doc, relevance and end-to-end
 cargo bench -p farol-core   # criterion benchmarks
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all --check
+
+# every interleaving of the concurrent snapshot cell
+RUSTFLAGS="--cfg loom" cargo test -p farol-core --lib snapshot --release
+
+# undefined behaviour in the unsafe code, with strict provenance
+MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test -p farol-core --lib -- snapshot:: codec:: index::
 ```
+
+All four run in CI.
 
 The tests in [`crates/core/tests/relevance.rs`](crates/core/tests/relevance.rs)
 pin which document must rank first for realistic queries over the sample corpus.
