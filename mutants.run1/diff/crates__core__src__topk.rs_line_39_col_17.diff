@@ -1,0 +1,21 @@
+--- crates/core/src/topk.rs
++++ delete match arm (false, true) in <impl Ord for Candidate>::cmp
+@@ -31,17 +31,17 @@
+ impl Ord for Candidate {
+     fn cmp(&self, other: &Self) -> Ordering {
+         // Reversed on score so the heap root is the lowest scoring candidate.
+         other
+             .score
+             .partial_cmp(&self.score)
+             .unwrap_or_else(|| match (self.score.is_nan(), other.score.is_nan()) {
+                 (true, false) => Ordering::Less,
+-                (false, true) => Ordering::Greater,
++                 /* ~ changed by cargo-mutants ~ */
+                 _ => Ordering::Equal,
+             })
+             // On a tie the *larger* document id sorts first, so it is the one
+             // evicted: ties resolve towards the lower id, matching the order a
+             // full sort produces.
+             .then(self.doc.cmp(&other.doc))
+     }
+ }

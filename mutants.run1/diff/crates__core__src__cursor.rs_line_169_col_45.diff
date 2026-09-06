@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace >= with < in BlockCursor<'a>::advance_to
+@@ -161,17 +161,17 @@
+     }
+ 
+     /// Moves to the first document `>= target`, returning it.
+     ///
+     /// Never moves backwards, so calling it with a target already behind the
+     /// cursor is a no-op — the pruning loop relies on that to push several
+     /// cursors at the same pivot without tracking which are already there.
+     pub fn advance_to(&mut self, target: DocId) -> Option<DocId> {
+-        if self.doc().is_some_and(|doc| doc >= target) {
++        if self.doc().is_some_and(|doc| doc < /* ~ changed by cargo-mutants ~ */ target) {
+             return self.doc();
+         }
+ 
+         // Walk the block index. Nothing here is decoded: one integer per block.
+         if self.block_last_doc().is_some_and(|last| last < target) {
+             let mut block = self.block + 1;
+             let blocks = self.term.blocks();
+             while block < blocks.len() && blocks[block].last_doc < target {

@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::block_last_doc -> Option<DocId> with None
+@@ -139,17 +139,17 @@
+ 
+     /// Index of the block the cursor is currently in.
+     pub fn block_index(&self) -> usize {
+         self.block
+     }
+ 
+     /// Last document id of the current block, for deciding where to skip to.
+     pub fn block_last_doc(&self) -> Option<DocId> {
+-        self.term.blocks().get(self.block).map(|meta| meta.last_doc)
++        None /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Postings left, including the current one. Used to report pruning.
+     pub fn remaining(&self) -> usize {
+         let in_block = self.decoded.len().saturating_sub(self.at);
+         let later: usize = self
+             .term
+             .blocks()

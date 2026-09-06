@@ -256,6 +256,23 @@ mod tests {
         // …and with neither condition present, the score must not be zero,
         // otherwise the guard is swallowing real matches.
         assert!(bm25.score(5, 100, AVG, 3.0) > 0.0, "healthy match");
+
+        // The guard also keeps the arithmetic away from NaN. With length
+        // normalisation disabled the ratio to the average is multiplied by
+        // zero, and `0.0 * inf` is NaN — which would sort unpredictably against
+        // real scores instead of ranking last. Each condition therefore has to
+        // stand on its own: it is `tf == 0 || avg <= 0`, never `&&`.
+        for bm25 in [Bm25::default(), Bm25::new(1.2, 0.0)] {
+            for (tf, len, avg) in [(0, 0, 0.0), (5, 100, 0.0), (0, 100, AVG)] {
+                let score = bm25.score(tf, len, avg, 3.0);
+                assert!(
+                    !score.is_nan(),
+                    "score(tf={tf}, len={len}, avg={avg}) with b={} is NaN",
+                    bm25.b
+                );
+                assert_eq!(score, 0.0);
+            }
+        }
     }
 
     #[test]

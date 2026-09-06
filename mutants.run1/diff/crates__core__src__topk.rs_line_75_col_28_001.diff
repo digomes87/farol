@@ -1,0 +1,21 @@
+--- crates/core/src/topk.rs
++++ replace < with > in TopK::threshold
+@@ -67,17 +67,17 @@
+         }
+     }
+ 
+     /// Score a new candidate must beat to enter the result set.
+     ///
+     /// Zero until the collector is full: before that, every scoring document is
+     /// worth keeping.
+     pub fn threshold(&self) -> f32 {
+-        if self.heap.len() < self.k {
++        if self.heap.len() > /* ~ changed by cargo-mutants ~ */ self.k {
+             0.0
+         } else {
+             self.heap.peek().map_or(0.0, |worst| worst.score)
+         }
+     }
+ 
+     /// Returns whether a document scoring `score` could enter the result set.
+     pub fn would_accept(&self, score: f32) -> bool {

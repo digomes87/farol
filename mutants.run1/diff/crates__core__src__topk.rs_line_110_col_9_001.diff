@@ -1,0 +1,35 @@
+--- crates/core/src/topk.rs
++++ replace TopK::into_sorted -> Vec<Hit> with vec![Default::default()]
+@@ -102,31 +102,17 @@
+                 self.heap.pop();
+                 self.heap.push(candidate);
+             }
+         }
+     }
+ 
+     /// Consumes the collector, returning the hits best first.
+     pub fn into_sorted(self) -> Vec<Hit> {
+-        let mut hits: Vec<Hit> = self
+-            .heap
+-            .into_iter()
+-            .map(|c| Hit {
+-                doc: c.doc,
+-                score: c.score,
+-            })
+-            .collect();
+-        hits.sort_unstable_by(|a, b| {
+-            b.score
+-                .partial_cmp(&a.score)
+-                .unwrap_or(Ordering::Equal)
+-                .then(a.doc.cmp(&b.doc))
+-        });
+-        hits
++        vec![Default::default()] /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+ 
+     fn collect(k: usize, scored: &[(DocId, f32)]) -> Vec<(DocId, f32)> {

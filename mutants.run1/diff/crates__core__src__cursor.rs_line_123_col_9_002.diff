@@ -1,0 +1,29 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::block_upper_bound_at -> f32 with -1.0
+@@ -115,25 +115,17 @@
+     /// Bound on this term's contribution to `doc`, taken from the block that
+     /// would contain it.
+     ///
+     /// Summing the *current* block's bound instead would be wrong whenever a
+     /// cursor still sits behind `doc`: the document lives in a later block,
+     /// whose bound may be higher, and the pruning decision would rest on an
+     /// underestimate.
+     pub fn block_upper_bound_at(&self, doc: DocId) -> f32 {
+-        match self.block_covering(doc) {
+-            Some(idx) => {
+-                let meta = &self.term.blocks()[idx];
+-                self.bm25
+-                    .score(meta.max_tf, meta.min_len, self.avg_doc_len, self.idf)
+-            }
+-            // The term has nothing left at or after `doc`.
+-            None => 0.0,
+-        }
++        -1.0 /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Last document of the block that would contain `doc`.
+     pub fn block_last_doc_at(&self, doc: DocId) -> Option<DocId> {
+         self.block_covering(doc)
+             .map(|idx| self.term.blocks()[idx].last_doc)
+     }
+ 

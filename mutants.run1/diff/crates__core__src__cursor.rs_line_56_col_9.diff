@@ -1,0 +1,27 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::load_block with ()
+@@ -48,23 +48,17 @@
+             bm25,
+             avg_doc_len,
+         };
+         cursor.load_block(0);
+         cursor
+     }
+ 
+     fn load_block(&mut self, block: usize) {
+-        self.block = block;
+-        self.at = 0;
+-        self.decoded = if block < self.term.blocks().len() {
+-            self.term.decode_block(block)
+-        } else {
+-            Vec::new()
+-        };
++        () /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Document the cursor points at, or `None` once exhausted.
+     pub fn doc(&self) -> Option<DocId> {
+         self.decoded.get(self.at).map(|p| p.doc)
+     }
+ 
+     /// Term frequency in the current document.

@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace >= with < in BlockCursor<'a>::advance_to
+@@ -180,17 +180,17 @@
+             if block >= blocks.len() {
+                 self.load_block(blocks.len());
+                 return None;
+             }
+             self.load_block(block);
+         }
+ 
+         self.at = gallop(&self.decoded, self.at, target);
+-        if self.at >= self.decoded.len() {
++        if self.at < /* ~ changed by cargo-mutants ~ */ self.decoded.len() {
+             let next = self.block + 1;
+             self.load_block(next);
+         }
+         self.doc()
+     }
+ 
+     /// Moves one posting forward, crossing into the next block if needed.
+     pub fn advance(&mut self) -> Option<DocId> {

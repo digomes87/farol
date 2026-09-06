@@ -1,0 +1,13 @@
+crates/core/src/bm25.rs:60:24: replace + with * in Bm25::idf
+crates/core/src/bm25.rs:60:19: replace - with + in Bm25::idf
+crates/core/src/bm25.rs:60:19: replace - with / in Bm25::idf
+crates/core/src/bm25.rs:60:37: replace + with - in Bm25::idf
+crates/core/src/bm25.rs:60:37: replace + with * in Bm25::idf
+crates/core/src/bm25.rs:72:20: replace || with && in Bm25::score
+crates/core/src/bm25.rs:76:60: replace / with * in Bm25::score
+crates/core/src/bm25.rs:77:19: replace * with / in Bm25::score
+crates/core/src/cursor.rs:58:33: replace < with <= in BlockCursor<'a>::load_block
+crates/core/src/cursor.rs:111:9: replace BlockCursor<'a>::block_covering -> Option<usize> with Some(0)
+crates/core/src/cursor.rs:136:9: replace BlockCursor<'a>::block_last_doc_at -> Option<DocId> with Some(Default::default())
+crates/core/src/cursor.rs:214:67: replace < with <= in gallop
+crates/core/src/cursor.rs:216:14: replace *= with += in gallop

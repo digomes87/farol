@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace + with * in BlockCursor<'a>::remaining
+@@ -149,17 +149,17 @@
+ 
+     /// Postings left, including the current one. Used to report pruning.
+     pub fn remaining(&self) -> usize {
+         let in_block = self.decoded.len().saturating_sub(self.at);
+         let later: usize = self
+             .term
+             .blocks()
+             .iter()
+-            .skip(self.block + 1)
++            .skip(self.block * /* ~ changed by cargo-mutants ~ */ 1)
+             .map(|meta| meta.count as usize)
+             .sum();
+         in_block + later
+     }
+ 
+     /// Moves to the first document `>= target`, returning it.
+     ///
+     /// Never moves backwards, so calling it with a target already behind the

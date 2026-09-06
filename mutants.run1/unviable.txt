@@ -1,0 +1,3 @@
+crates/core/src/topk.rs:34:9: replace <impl Ord for Candidate>::cmp -> Ordering with Default::default()
+crates/core/src/topk.rs:51:9: replace <impl PartialOrd for Candidate>::partial_cmp -> Option<Ordering> with Some(Default::default())
+crates/core/src/topk.rs:110:9: replace TopK::into_sorted -> Vec<Hit> with vec![Default::default()]

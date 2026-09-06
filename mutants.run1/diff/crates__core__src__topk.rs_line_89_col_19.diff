@@ -1,0 +1,21 @@
+--- crates/core/src/topk.rs
++++ replace == with != in TopK::offer
+@@ -81,17 +81,17 @@
+ 
+     /// Returns whether a document scoring `score` could enter the result set.
+     pub fn would_accept(&self, score: f32) -> bool {
+         self.heap.len() < self.k || score > self.threshold()
+     }
+ 
+     /// Offers a scored document, keeping it only if it belongs in the top `k`.
+     pub fn offer(&mut self, doc: DocId, score: f32) {
+-        if self.k == 0 {
++        if self.k != /* ~ changed by cargo-mutants ~ */ 0 {
+             return;
+         }
+         let candidate = Candidate { doc, score };
+         if self.heap.len() < self.k {
+             self.heap.push(candidate);
+             return;
+         }
+         // `Less` means "better" under this reversed ordering. Equality keeps

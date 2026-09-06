@@ -1,0 +1,431 @@
+
+*** crates/core/src/codec.rs:65:28: replace - with + in encode_sorted
+
+*** mutation diff:
+--- crates/core/src/codec.rs
++++ replace - with + in encode_sorted
+@@ -57,17 +57,17 @@
+ 
+ /// Encodes a strictly increasing sequence as deltas, appending to `out`.
+ ///
+ /// The first value is written as is; every later one as its distance from its
+ /// predecessor.
+ pub fn encode_sorted(values: &[u32], out: &mut Vec<u8>) {
+     let mut previous = 0u32;
+     for &value in values {
+-        write_varint(value - previous, out);
++        write_varint(value + /* ~ changed by cargo-mutants ~ */ previous, out);
+         previous = value;
+     }
+ }
+ 
+ /// Decodes `count` delta encoded values, returning them and the bytes consumed.
+ pub fn decode_sorted(bytes: &[u8], count: usize) -> (Vec<u32>, usize) {
+     let mut values = Vec::with_capacity(count);
+     let mut consumed = 0;
+
+
+*** /Users/diegogo/.rustup/toolchains/stable-aarch64-apple-darwin/bin/cargo test --no-run --verbose --package=farol-core@0.1.0
+       Fresh unicode-ident v1.0.24
+       Fresh cfg-if v1.0.4
+       Fresh autocfg v1.5.1
+       Fresh either v1.18.0
+       Fresh memchr v2.8.3
+       Fresh proc-macro2 v1.0.107
+       Fresh tinyvec_macros v0.1.1
+       Fresh regex-syntax v0.8.11
+       Fresh plotters-backend v0.3.7
+       Fresh quote v1.0.47
+       Fresh libc v0.2.189
+       Fresh serde_core v1.0.229
+       Fresh crossbeam-utils v0.8.23
+       Fresh zmij v1.0.23
+       Fresh clap_lex v1.1.0
+       Fresh ciborium-io v0.2.2
+       Fresh anstyle v1.0.14
+       Fresh itoa v1.0.18
+       Fresh tinyvec v1.13.2
+       Fresh plotters-svg v0.3.7
+       Fresh regex-automata v0.4.18
+       Fresh itertools v0.10.5
+       Fresh syn v3.0.5
+       Fresh syn v2.0.119
+       Fresh crossbeam-epoch v0.9.21
+       Fresh clap_builder v4.6.6
+       Fresh serde_json v1.0.151
+       Fresh errno v0.3.14
+       Fresh num-traits v0.2.19
+       Fresh once_cell v1.21.4
+       Fresh same-file v1.0.6
+       Fresh bitflags v2.13.1
+       Fresh cast v0.3.0
+       Fresh memmap2 v0.9.11
+       Fresh unicode-normalization v0.1.25
+       Fresh is-terminal v0.4.17
+       Fresh regex v1.13.1
+       Fresh serde_derive v1.0.229
+       Fresh zerocopy-derive v0.8.56
+       Fresh crossbeam-deque v0.8.8
+       Fresh thiserror-impl v2.0.20
+       Fresh clap v4.6.6
+       Fresh plotters v0.3.7
+       Fresh rustix v1.1.4
+       Fresh getrandom v0.4.3
+       Fresh criterion-plot v0.5.0
+       Fresh walkdir v2.5.0
+       Fresh anes v0.1.6
+       Fresh oorandom v11.1.5
+       Fresh fastrand v2.5.0
+       Fresh serde v1.0.229
+       Fresh zerocopy v0.8.56
+       Fresh rayon-core v1.13.0
+       Fresh thiserror v2.0.20
+       Fresh tempfile v3.27.0
+       Fresh half v2.7.1
+       Fresh rayon v1.12.0
+       Fresh tinytemplate v1.2.1
+       Fresh bincode v1.3.3
+       Fresh ciborium-ll v0.2.2
+       Dirty farol-core v0.1.0 (/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/crates/core): the file `crates/core/src/codec.rs` has changed (1788707210.635173494s, 2s after last build at 1788707208.529323803s)
+   Compiling farol-core v0.1.0 (/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/crates/core)
+       Fresh ciborium v0.2.2
+       Fresh criterion v0.5.1
+     Running `/Users/diegogo/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc --crate-name farol_core --edition=2021 crates/core/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 -C split-debuginfo=unpacked --warn=unexpected_cfgs --check-cfg 'cfg(loom)' --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=fbd402c5829ccff0 -C extra-filename=-372b15c76dddf5b2 --out-dir /private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps -C incremental=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/incremental -L dependency=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps --extern bincode=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libbincode-95c7ea5c0ec9a36e.rlib --extern criterion=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libcriterion-7ad3f0c1d4488ac6.rlib --extern memmap2=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libmemmap2-1b266ad38812c5e6.rlib --extern rayon=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/librayon-a880cf08b47986ad.rlib --extern serde=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libserde-dc473168293d285a.rlib --extern tempfile=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libtempfile-ca1a264b2b376e63.rlib --extern thiserror=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libthiserror-8a11e7add1c8cf69.rlib --extern unicode_normalization=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libunicode_normalization-fc66067d423c21c9.rlib`
+     Running `/Users/diegogo/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc --crate-name farol_core --edition=2021 crates/core/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 -C split-debuginfo=unpacked --warn=unexpected_cfgs --check-cfg 'cfg(loom)' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=4d1102f362dae130 -C extra-filename=-7996c1b4355c7c9e --out-dir /private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps -C incremental=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/incremental -L dependency=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps --extern bincode=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libbincode-95c7ea5c0ec9a36e.rmeta --extern memmap2=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libmemmap2-1b266ad38812c5e6.rmeta --extern rayon=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/librayon-a880cf08b47986ad.rmeta --extern serde=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libserde-dc473168293d285a.rmeta --extern thiserror=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libthiserror-8a11e7add1c8cf69.rmeta --extern unicode_normalization=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libunicode_normalization-fc66067d423c21c9.rmeta`
+     Running `/Users/diegogo/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc --crate-name relevance --edition=2021 crates/core/tests/relevance.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 -C split-debuginfo=unpacked --warn=unexpected_cfgs --check-cfg 'cfg(loom)' --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=367d6d9188bb39a6 -C extra-filename=-5da9427daa1bc2eb --out-dir /private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps -C incremental=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/incremental -L dependency=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps --extern bincode=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libbincode-95c7ea5c0ec9a36e.rlib --extern criterion=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libcriterion-7ad3f0c1d4488ac6.rlib --extern farol_core=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libfarol_core-7996c1b4355c7c9e.rlib --extern memmap2=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libmemmap2-1b266ad38812c5e6.rlib --extern rayon=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/librayon-a880cf08b47986ad.rlib --extern serde=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libserde-dc473168293d285a.rlib --extern tempfile=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libtempfile-ca1a264b2b376e63.rlib --extern thiserror=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libthiserror-8a11e7add1c8cf69.rlib --extern unicode_normalization=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libunicode_normalization-fc66067d423c21c9.rlib`
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.07s
+  Executable `/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/farol_core-372b15c76dddf5b2`
+  Executable `/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/relevance-5da9427daa1bc2eb`
+
+*** result: Success
+
+*** /Users/diegogo/.rustup/toolchains/stable-aarch64-apple-darwin/bin/cargo test --verbose --package=farol-core@0.1.0
+       Fresh unicode-ident v1.0.24
+       Fresh cfg-if v1.0.4
+       Fresh autocfg v1.5.1
+       Fresh either v1.18.0
+       Fresh proc-macro2 v1.0.107
+       Fresh regex-syntax v0.8.11
+       Fresh clap_lex v1.1.0
+       Fresh quote v1.0.47
+       Fresh libc v0.2.189
+       Fresh serde_core v1.0.229
+       Fresh crossbeam-utils v0.8.23
+       Fresh zmij v1.0.23
+       Fresh itoa v1.0.18
+       Fresh memchr v2.8.3
+       Fresh plotters-backend v0.3.7
+       Fresh ciborium-io v0.2.2
+       Fresh tinyvec_macros v0.1.1
+       Fresh anstyle v1.0.14
+       Fresh regex-automata v0.4.18
+       Fresh syn v3.0.5
+       Fresh syn v2.0.119
+       Fresh crossbeam-epoch v0.9.21
+       Fresh num-traits v0.2.19
+       Fresh tinyvec v1.13.2
+       Fresh clap_builder v4.6.6
+       Fresh errno v0.3.14
+       Fresh serde_json v1.0.151
+       Fresh plotters-svg v0.3.7
+       Fresh itertools v0.10.5
+       Fresh same-file v1.0.6
+       Fresh bitflags v2.13.1
+       Fresh once_cell v1.21.4
+       Fresh cast v0.3.0
+       Fresh serde_derive v1.0.229
+       Fresh zerocopy-derive v0.8.56
+       Fresh crossbeam-deque v0.8.8
+       Fresh thiserror-impl v2.0.20
+       Fresh rustix v1.1.4
+       Fresh unicode-normalization v0.1.25
+       Fresh criterion-plot v0.5.0
+       Fresh plotters v0.3.7
+       Fresh clap v4.6.6
+       Fresh walkdir v2.5.0
+       Fresh memmap2 v0.9.11
+       Fresh regex v1.13.1
+       Fresh is-terminal v0.4.17
+       Fresh getrandom v0.4.3
+       Fresh oorandom v11.1.5
+       Fresh anes v0.1.6
+       Fresh serde v1.0.229
+       Fresh zerocopy v0.8.56
+       Fresh rayon-core v1.13.0
+       Fresh thiserror v2.0.20
+       Fresh fastrand v2.5.0
+       Fresh half v2.7.1
+       Fresh rayon v1.12.0
+       Fresh tinytemplate v1.2.1
+       Fresh bincode v1.3.3
+       Fresh tempfile v3.27.0
+       Fresh ciborium-ll v0.2.2
+       Fresh ciborium v0.2.2
+       Fresh criterion v0.5.1
+       Fresh farol-core v0.1.0 (/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/crates/core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running `/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/farol_core-372b15c76dddf5b2`
+
+running 138 tests
+test analyzer::tests::raw_analyzer_preserves_every_token ... ok
+test analyzer::tests::split_words_yields_byte_spans_of_the_original_text ... ok
+test analyzer::tests::stem_collapses_portuguese_plurals ... ok
+test analyzer::tests::stem_is_idempotent ... ok
+test analyzer::tests::stem_leaves_short_words_untouched ... ok
+test analyzer::tests::indexing_and_query_produce_the_same_terms ... ok
+test bm25::tests::absent_terms_and_empty_indexes_score_zero ... ok
+test bm25::tests::b_zero_disables_length_normalisation ... ok
+test bm25::tests::idf_falls_as_the_term_becomes_common ... ok
+test bm25::tests::k1_zero_makes_term_frequency_binary ... ok
+test bm25::tests::idf_never_goes_negative_for_ubiquitous_terms ... ok
+test analyzer::tests::analyze_keeps_positions_across_removed_stopwords ... ok
+test bm25::tests::parameters_are_clamped_to_a_valid_range ... ok
+test bm25::tests::short_documents_outrank_long_ones_for_the_same_match ... ok
+test analyzer::tests::normalize_strips_accents_and_case ... ok
+test bm25::tests::term_frequency_saturates ... ok
+test analyzer::tests::offsets_point_at_the_original_word ... ok
+test codec::tests::a_single_value_and_an_empty_slice_are_handled ... ok
+test codec::tests::an_unterminated_varint_does_not_read_past_the_slice ... ok
+test codec::tests::plain_values_round_trip_without_the_sorted_assumption ... ok
+test codec::tests::truncated_input_stops_instead_of_looping_or_panicking ... ok
+test codec::tests::varint_length_grows_with_magnitude ... ok
+test codec::tests::decoding_more_values_than_encoded_returns_what_exists ... FAILED
+test codec::tests::varints_round_trip_across_every_size_boundary ... ok
+test codec::tests::delta_encoding_beats_fixed_width_on_dense_lists ... FAILED
+test codec::tests::sorted_sequences_round_trip ... FAILED
+test cursor::tests::a_new_cursor_points_at_the_first_document ... ok
+test cursor::tests::skipping_past_the_end_exhausts_the_cursor ... ok
+test cursor::tests::remaining_counts_the_postings_still_ahead ... ok
+test cursor::tests::advance_walks_every_posting_across_block_boundaries ... FAILED
+test cursor::tests::a_block_bound_is_never_looser_than_the_term_bound ... ok
+test engine::tests::an_unparsable_query_is_an_error_not_an_empty_result ... ok
+test cursor::tests::advance_to_never_moves_backwards ... FAILED
+test engine::tests::indexing_a_missing_directory_reports_the_path ... ok
+test index::tests::avg_doc_len_is_the_mean_term_count ... ok
+test index::tests::compressed_postings_decode_back_to_what_was_indexed ... ok
+test cursor::tests::a_long_skip_decodes_only_the_landing_block ... FAILED
+test cursor::tests::advance_to_matches_a_linear_scan_on_every_target ... FAILED
+test index::tests::compression_shrinks_a_dense_posting_list ... ok
+test index::tests::empty_index_reports_zero_average_length ... ok
+test index::tests::doc_freq_counts_documents_not_occurrences ... ok
+test index::tests::finish_records_the_score_bounds_of_every_term ... ok
+test index::tests::finish_sorts_posting_lists_by_doc_id ... ok
+test index::tests::merge_renumbers_documents_and_keeps_postings_aligned ... ok
+test index::tests::postings_record_every_position ... ok
+test index::tests::every_block_carries_its_own_score_bounds ... ok
+test index::tests::posting_lists_are_split_into_blocks ... ok
+test index::tests::reopening_a_sealed_index_keeps_the_earlier_postings ... ok
+test index::tests::score_bounds_are_refreshed_after_a_merge ... ok
+test mmap::tests::a_foreign_file_is_rejected ... ok
+test mmap::tests::documents_are_read_straight_from_the_mapping ... ok
+test engine::tests::a_mapped_index_refuses_further_indexing ... ok
+test engine::tests::search_returns_titles_scores_and_snippets ... ok
+test engine::tests::a_shared_term_ranks_both_documents ... ok
+test engine::tests::crawling_picks_text_files_recursively_and_skips_the_rest ... ok
+test engine::tests::extensions_can_be_restricted ... ok
+test query::tests::a_phrase_can_be_required_or_forbidden ... ok
+test query::tests::a_query_of_only_exclusions_is_rejected ... ok
+test mmap::tests::an_empty_index_maps_cleanly ... ok
+test engine::tests::an_engine_round_trips_through_the_serialised_format_too ... ok
+test mmap::tests::a_mapped_index_answers_like_the_one_in_memory ... ok
+test query::tests::a_query_of_only_stopwords_is_rejected ... ok
+test engine::tests::markdown_headings_become_titles ... ok
+test mmap::tests::a_truncated_file_is_rejected_instead_of_read ... ok
+test query::tests::a_single_word_phrase_degrades_to_a_term ... ok
+test query::tests::bare_terms_are_optional ... ok
+test query::tests::phrase_offsets_keep_the_gap_left_by_a_stopword ... ok
+test query::tests::positive_terms_ignore_exclusions ... ok
+test query::tests::prefixes_set_the_boolean_role ... ok
+test query::tests::quoted_text_becomes_a_phrase_with_relative_offsets ... ok
+test query::tests::unterminated_quote_is_rejected ... ok
+test query::tests::queries_are_analyzed_like_documents ... ok
+test mmap::tests::queries_run_against_a_mapped_index ... ok
+test engine::tests::search_reports_the_strategy_it_used ... ok
+test engine::tests::both_formats_return_the_same_results ... ok
+test searcher::tests::constrained_queries_fall_back_to_exhaustive_evaluation ... ok
+test searcher::tests::documents_matching_more_clauses_rank_higher ... FAILED
+test searcher::tests::excluded_terms_are_removed_from_the_results ... FAILED
+test searcher::tests::limit_truncates_the_ranking ... ok
+test searcher::tests::optional_terms_match_any_document ... ok
+test searcher::tests::phrases_do_not_match_terms_that_are_merely_present ... ok
+test engine::tests::an_engine_round_trips_through_a_mapped_index ... ok
+test searcher::tests::phrases_require_adjacency_in_the_right_order ... FAILED
+test searcher::tests::scores_are_positive_and_ordered ... ok
+test searcher::tests::required_terms_intersect ... FAILED
+test searcher::tests::searching_an_empty_index_is_not_an_error ... ok
+test searcher::tests::unknown_terms_yield_no_results ... ok
+test mmap::tests::score_bounds_survive_the_round_trip ... ok
+test mmap::tests::posting_lists_decode_to_the_same_values ... ok
+test mmap::tests::the_dictionary_binary_search_finds_every_term ... ok
+test snapshot::tests::a_held_snapshot_survives_replacement ... ok
+test service::tests::publishing_an_engine_directly_bumps_the_generation ... ok
+test service::tests::a_snapshot_keeps_answering_from_the_generation_it_took ... ok
+test snapshot::tests::load_returns_the_current_value ... ok
+test service::tests::a_new_service_serves_generation_one ... ok
+test service::tests::a_rebuild_inherits_the_configuration_in_service ... ok
+test service::tests::queries_keep_being_answered_while_the_index_is_rebuilt ... FAILED
+test snapshot::tests::readers_keep_making_progress_while_a_writer_swaps ... ok
+test service::tests::reindexing_publishes_the_next_generation ... ok
+test snapshot::tests::store_returns_the_previous_value ... ok
+test snapshot::tests::superseded_values_are_reclaimed_once_readers_are_gone ... ok
+test snapshot::tests::reclamation_is_skipped_rather_than_waited_for ... ok
+test snapshot::tests::the_cell_drops_its_value_exactly_once ... ok
+test snippet::tests::documents_without_a_visible_match_fall_back_to_the_head ... ok
+test snippet::tests::short_documents_are_returned_whole ... ok
+test searcher::tests::pruning_can_be_turned_off_without_changing_the_ranking ... FAILED
+test snippet::tests::matched_words_are_wrapped_in_the_markers ... ok
+test snippet::tests::markers_are_configurable ... ok
+test searcher::tests::pruning_and_exhaustive_scoring_return_the_same_ranking ... FAILED
+test service::tests::concurrent_rebuilds_are_serialised_and_numbered_without_gaps ... ok
+test snapshot::tests::concurrent_writers_leave_one_of_their_values_current ... ok
+test snippet::tests::snippets_are_single_line ... ok
+test snippet::tests::the_window_prefers_the_most_distinct_terms ... ok
+test source::tests::a_memory_source_can_still_be_extended ... ok
+test snippet::tests::the_window_moves_to_where_the_matches_are ... ok
+test snippet::tests::windows_never_split_a_multibyte_character ... ok
+test source::tests::an_edit_is_sealed_back_even_when_the_caller_returns_early ... ok
+test source::tests::a_mapped_source_refuses_to_be_written_to ... ok
+test service::tests::a_mapped_index_can_be_adopted_without_rebuilding_it ... ok
+test topk::tests::a_zero_sized_collector_keeps_nothing ... ok
+test topk::tests::fewer_documents_than_k_is_fine ... ok
+test store::tests::a_foreign_file_is_rejected_before_decoding ... ok
+test store::tests::a_future_format_version_is_reported_clearly ... ok
+test store::tests::a_reloaded_index_still_answers_queries ... ok
+test store::tests::an_index_survives_a_round_trip ... ok
+test topk::tests::keeps_only_the_best_k ... ok
+test topk::tests::the_threshold_is_zero_until_it_fills_up ... ok
+test topk::tests::the_threshold_rises_as_better_documents_arrive ... ok
+test topk::tests::ties_resolve_towards_the_lower_document_id ... ok
+test topk::tests::would_accept_agrees_with_offer ... ok
+test source::tests::both_sources_answer_identically ... ok
+test store::tests::a_truncated_index_is_a_decode_error_not_a_panic ... ok
+test engine::tests::parallel_indexing_produces_the_same_ids_as_a_sequential_run ... ok
+test store::tests::saving_twice_replaces_the_file_and_leaves_no_temporary ... ok
+test searcher::tests::pruning_holds_under_retuned_ranking_parameters ... FAILED
+test searcher::tests::a_smaller_limit_prunes_more ... ok
+test searcher::tests::pruning_scores_far_fewer_documents_than_it_matches ... ok
+test searcher::tests::block_max_bounds_skip_whole_blocks ... ok
+
+failures:
+
+---- codec::tests::decoding_more_values_than_encoded_returns_what_exists stdout ----
+
+thread 'codec::tests::decoding_more_values_than_encoded_returns_what_exists' (12842586) panicked at crates/core/src/codec.rs:213:9:
+assertion `left == right` failed
+  left: [5, 20]
+ right: [5, 10]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- codec::tests::delta_encoding_beats_fixed_width_on_dense_lists stdout ----
+
+thread 'codec::tests::delta_encoding_beats_fixed_width_on_dense_lists' (12842587) panicked at crates/core/src/codec.rs:164:9:
+expected strong compression, got 3000 bytes for 1000 values
+
+---- codec::tests::sorted_sequences_round_trip stdout ----
+
+thread 'codec::tests::sorted_sequences_round_trip' (12842589) panicked at crates/core/src/codec.rs:153:9:
+assertion `left == right` failed
+  left: [5, 52, 173, 368, 637, 980, 1397, 1888, 2453, 3092, 3805, 4592, 5453, 6388, 7397, 8480, 9637, 10868, 12173, 13552, 15005, 16532, 18133, 19808, 21557, 23380, 25277, 27248, 29293, 31412, 33605, 35872, 38213, 40628, 43117, 45680, 48317, 51028, 53813, 56672, 59605, 62612, 65693, 68848, 72077, 75380, 78757, 82208, 85733, 89332, 93005, 96752, 100573, 104468, 108437, 112480, 116597, 120788, 125053, 129392, 133805, 138292, 142853, 147488, 152197, 156980, 161837, 166768, 171773, 176852, 182005, 187232, 192533, 197908, 203357, 208880, 214477, 220148, 225893, 231712, 237605, 243572, 249613, 255728, 261917, 268180, 274517, 280928, 287413, 293972, 300605, 307312, 314093, 320948, 327877, 334880, 341957, 349108, 356333, 363632, 371005, 378452, 385973, 393568, 401237, 408980, 416797, 424688, 432653, 440692, 448805, 456992, 465253, 473588, 481997, 490480, 499037, 507668, 516373, 525152, 534005, 542932, 551933, 561008, 570157, 579380, 588677, 598048, 607493, 617012, 626605, 636272, 646013, 655828, 665717, 675680, 685717, 695828, 706013, 716272, 726605, 737012, 747493, 758048, 768677, 779380, 790157, 801008, 811933, 822932, 834005, 845152, 856373, 867668, 879037, 890480, 901997, 913588, 925253, 936992, 948805, 960692, 972653, 984688, 996797, 1008980, 1021237, 1033568, 1045973, 1058452, 1071005, 1083632, 1096333, 1109108, 1121957, 1134880, 1147877, 1160948, 1174093, 1187312, 1200605, 1213972, 1227413, 1240928, 1254517, 1268180, 1281917, 1295728, 1309613, 1323572, 1337605, 1351712, 1365893, 1380148, 1394477, 1408880, 1423357, 1437908, 1452533, 1467232, 1482005, 1496852, 1511773, 1526768, 1541837, 1556980, 1572197, 1587488, 1602853, 1618292, 1633805, 1649392, 1665053, 1680788, 1696597, 1712480, 1728437, 1744468, 1760573, 1776752, 1793005, 1809332, 1825733, 1842208, 1858757, 1875380, 1892077, 1908848, 1925693, 1942612, 1959605, 1976672, 1993813, 2011028, 2028317, 2045680, 2063117, 2080628, 2098213, 2115872, 2133605, 2151412, 2169293, 2187248, 2205277, 2223380, 2241557, 2259808, 2278133, 2296532, 2315005, 2333552, 2352173, 2370868, 2389637, 2408480, 2427397, 2446388, 2465453, 2484592, 2503805, 2523092, 2542453, 2561888, 2581397, 2600980, 2620637, 2640368, 2660173, 2680052, 2700005, 2720032, 2740133, 2760308, 2780557, 2800880, 2821277, 2841748, 2862293, 2882912, 2903605, 2924372, 2945213, 2966128, 2987117, 3008180, 3029317, 3050528, 3071813, 3093172, 3114605, 3136112, 3157693, 3179348, 3201077, 3222880, 3244757, 3266708, 3288733, 3310832, 3333005, 3355252, 3377573, 3399968, 3422437, 3444980, 3467597, 3490288, 3513053, 3535892, 3558805, 3581792, 3604853, 3627988, 3651197, 3674480, 3697837, 3721268, 3744773, 3768352, 3792005, 3815732, 3839533, 3863408, 3887357, 3911380, 3935477, 3959648, 3983893, 4008212, 4032605, 4057072, 4081613, 4106228, 4130917, 4155680, 4180517, 4205428, 4230413, 4255472, 4280605, 4305812, 4331093, 4356448, 4381877, 4407380, 4432957, 4458608, 4484333, 4510132, 4536005, 4561952, 4587973, 4614068, 4640237, 4666480, 4692797, 4719188, 4745653, 4772192, 4798805, 4825492, 4852253, 4879088, 4905997, 4932980, 4960037, 4987168, 5014373, 5041652, 5069005, 5096432, 5123933, 5151508, 5179157, 5206880, 5234677, 5262548, 5290493, 5318512, 5346605, 5374772, 5403013, 5431328, 5459717, 5488180, 5516717, 5545328, 5574013, 5602772, 5631605, 5660512, 5689493, 5718548, 5747677, 5776880, 5806157, 5835508, 5864933, 5894432, 5924005, 5953652, 5983373, 6013168, 6043037, 6072980, 6102997, 6133088, 6163253, 6193492, 6223805, 6254192, 6284653, 6315188, 6345797, 6376480, 6407237, 6438068, 6468973, 6499952, 6531005, 6562132, 6593333, 6624608, 6655957, 6687380, 6718877, 6750448, 6782093, 6813812, 6845605, 6877472, 6909413, 6941428, 6973517, 7005680, 7037917, 7070228, 7102613, 7135072, 7167605, 7200212, 7232893, 7265648, 7298477, 7331380, 7364357, 7397408, 7430533, 7463732, 7497005, 7530352, 7563773, 7597268, 7630837, 7664480, 7698197, 7731988, 7765853, 7799792, 7833805, 7867892, 7902053, 7936288, 7970597, 8004980, 8039437, 8073968, 8108573, 8143252, 8178005, 8212832, 8247733, 8282708, 8317757, 8352880, 8388077, 8423348, 8458693, 8494112, 8529605, 8565172, 8600813, 8636528, 8672317, 8708180, 8744117, 8780128, 8816213, 8852372, 8888605, 8924912, 8961293, 8997748, 9034277, 9070880, 9107557, 9144308, 9181133, 9218032, 9255005, 9292052, 9329173, 9366368, 9403637, 9440980, 9478397, 9515888, 9553453, 9591092, 9628805, 9666592, 9704453, 9742388, 9780397, 9818480, 9856637, 9894868, 9933173, 9971552, 10010005, 10048532, 10087133, 10125808, 10164557, 10203380, 10242277, 10281248, 10320293, 10359412, 10398605, 10437872, 10477213, 10516628, 10556117, 10595680, 10635317, 10675028, 10714813, 10754672, 10794605, 10834612, 10874693, 10914848, 10955077, 10995380, 11035757, 11076208, 11116733, 11157332, 11198005, 11238752, 11279573, 11320468, 11361437, 11402480, 11443597, 11484788, 11526053, 11567392, 11608805, 11650292, 11691853, 11733488, 11775197, 11816980, 11858837, 11900768, 11942773, 11984852, 12027005, 12069232, 12111533, 12153908, 12196357, 12238880, 12281477, 12324148, 12366893, 12409712, 12452605, 12495572, 12538613, 12581728, 12624917, 12668180, 12711517, 12754928, 12798413, 12841972, 12885605, 12929312, 12973093, 13016948, 13060877, 13104880, 13148957, 13193108, 13237333, 13281632, 13326005, 13370452, 13414973, 13459568, 13504237, 13548980, 13593797, 13638688, 13683653, 13728692, 13773805, 13818992, 13864253, 13909588, 13954997, 14000480, 14046037, 14091668, 14137373, 14183152, 14229005, 14274932, 14320933, 14367008, 14413157, 14459380, 14505677, 14552048, 14598493, 14645012, 14691605, 14738272, 14785013, 14831828, 14878717, 14925680, 14972717, 15019828, 15067013, 15114272, 15161605, 15209012, 15256493, 15304048, 15351677, 15399380, 15447157, 15495008, 15542933, 15590932, 15639005, 15687152, 15735373, 15783668, 15832037, 15880480, 15928997, 15977588, 16026253, 16074992, 16123805, 16172692, 16221653, 16270688, 16319797, 16368980, 16418237, 16467568, 16516973, 16566452, 16616005, 16665632, 16715333, 16765108, 16814957, 16864880, 16914877, 16964948, 17015093, 17065312, 17115605, 17165972, 17216413, 17266928, 17317517, 17368180, 17418917, 17469728, 17520613, 17571572, 17622605, 17673712, 17724893, 17776148, 17827477, 17878880, 17930357, 17981908, 18033533, 18085232, 18137005, 18188852, 18240773, 18292768, 18344837, 18396980, 18449197, 18501488, 18553853, 18606292, 18658805, 18711392, 18764053, 18816788, 18869597, 18922480, 18975437, 19028468, 19081573, 19134752, 19188005, 19241332, 19294733, 19348208, 19401757, 19455380, 19509077, 19562848, 19616693, 19670612, 19724605, 19778672, 19832813, 19887028, 19941317, 19995680, 20050117, 20104628, 20159213, 20213872, 20268605, 20323412, 20378293, 20433248, 20488277, 20543380, 20598557, 20653808, 20709133, 20764532, 20820005, 20875552, 20931173, 20986868, 21042637, 21098480, 21154397, 21210388, 21266453, 21322592, 21378805, 21435092, 21491453, 21547888, 21604397, 21660980, 21717637, 21774368, 21831173, 21888052, 21945005, 22002032, 22059133, 22116308, 22173557, 22230880, 22288277, 22345748, 22403293, 22460912, 22518605, 22576372, 22634213, 22692128, 22750117, 22808180, 22866317, 22924528, 22982813, 23041172, 23099605, 23158112, 23216693, 23275348, 23334077, 23392880, 23451757, 23510708, 23569733, 23628832, 23688005, 23747252, 23806573, 23865968, 23925437, 23984980, 24044597, 24104288, 24164053, 24223892, 24283805, 24343792, 24403853, 24463988, 24524197, 24584480, 24644837, 24705268, 24765773, 24826352, 24887005, 24947732, 25008533, 25069408, 25130357, 25191380, 25252477, 25313648, 25374893, 25436212, 25497605, 25559072, 25620613, 25682228, 25743917, 25805680, 25867517, 25929428, 25991413, 26053472, 26115605, 26177812, 26240093, 26302448, 26364877, 26427380, 26489957, 26552608, 26615333, 26678132, 26741005, 26803952, 26866973, 26930068, 26993237, 27056480, 27119797, 27183188, 27246653, 27310192, 27373805, 27437492, 27501253, 27565088, 27628997, 27692980, 27757037, 27821168, 27885373, 27949652, 28014005, 28078432, 28142933, 28207508, 28272157, 28336880, 28401677, 28466548, 28531493, 28596512, 28661605, 28726772, 28792013, 28857328, 28922717, 28988180, 29053717, 29119328, 29185013, 29250772, 29316605, 29382512, 29448493, 29514548, 29580677, 29646880, 29713157, 29779508, 29845933, 29912432, 29979005, 30045652, 30112373, 30179168, 30246037, 30312980, 30379997, 30447088, 30514253, 30581492, 30648805, 30716192, 30783653, 30851188, 30918797, 30986480, 31054237, 31122068, 31189973, 31257952, 31326005, 31394132, 31462333, 31530608, 31598957, 31667380, 31735877, 31804448, 31873093, 31941812, 32010605, 32079472, 32148413, 32217428, 32286517, 32355680, 32424917, 32494228, 32563613, 32633072, 32702605, 32772212, 32841893, 32911648, 32981477, 33051380, 33121357, 33191408, 33261533, 33331732, 33402005, 33472352, 33542773, 33613268, 33683837, 33754480, 33825197, 33895988, 33966853, 34037792, 34108805, 34179892, 34251053, 34322288, 34393597, 34464980, 34536437, 34607968, 34679573, 34751252, 34823005, 34894832, 34966733, 35038708, 35110757, 35182880, 35255077, 35327348, 35399693, 35472112, 35544605, 35617172, 35689813, 35762528, 35835317, 35908180, 35981117, 36054128, 36127213, 36200372, 36273605, 36346912, 36420293, 36493748, 36567277, 36640880, 36714557, 36788308, 36862133, 36936032]
+ right: [5, 42, 79, 116, 153, 190, 227, 264, 301, 338, 375, 412, 449, 486, 523, 560, 597, 634, 671, 708, 745, 782, 819, 856, 893, 930, 967, 1004, 1041, 1078, 1115, 1152, 1189, 1226, 1263, 1300, 1337, 1374, 1411, 1448, 1485, 1522, 1559, 1596, 1633, 1670, 1707, 1744, 1781, 1818, 1855, 1892, 1929, 1966, 2003, 2040, 2077, 2114, 2151, 2188, 2225, 2262, 2299, 2336, 2373, 2410, 2447, 2484, 2521, 2558, 2595, 2632, 2669, 2706, 2743, 2780, 2817, 2854, 2891, 2928, 2965, 3002, 3039, 3076, 3113, 3150, 3187, 3224, 3261, 3298, 3335, 3372, 3409, 3446, 3483, 3520, 3557, 3594, 3631, 3668, 3705, 3742, 3779, 3816, 3853, 3890, 3927, 3964, 4001, 4038, 4075, 4112, 4149, 4186, 4223, 4260, 4297, 4334, 4371, 4408, 4445, 4482, 4519, 4556, 4593, 4630, 4667, 4704, 4741, 4778, 4815, 4852, 4889, 4926, 4963, 5000, 5037, 5074, 5111, 5148, 5185, 5222, 5259, 5296, 5333, 5370, 5407, 5444, 5481, 5518, 5555, 5592, 5629, 5666, 5703, 5740, 5777, 5814, 5851, 5888, 5925, 5962, 5999, 6036, 6073, 6110, 6147, 6184, 6221, 6258, 6295, 6332, 6369, 6406, 6443, 6480, 6517, 6554, 6591, 6628, 6665, 6702, 6739, 6776, 6813, 6850, 6887, 6924, 6961, 6998, 7035, 7072, 7109, 7146, 7183, 7220, 7257, 7294, 7331, 7368, 7405, 7442, 7479, 7516, 7553, 7590, 7627, 7664, 7701, 7738, 7775, 7812, 7849, 7886, 7923, 7960, 7997, 8034, 8071, 8108, 8145, 8182, 8219, 8256, 8293, 8330, 8367, 8404, 8441, 8478, 8515, 8552, 8589, 8626, 8663, 8700, 8737, 8774, 8811, 8848, 8885, 8922, 8959, 8996, 9033, 9070, 9107, 9144, 9181, 9218, 9255, 9292, 9329, 9366, 9403, 9440, 9477, 9514, 9551, 9588, 9625, 9662, 9699, 9736, 9773, 9810, 9847, 9884, 9921, 9958, 9995, 10032, 10069, 10106, 10143, 10180, 10217, 10254, 10291, 10328, 10365, 10402, 10439, 10476, 10513, 10550, 10587, 10624, 10661, 10698, 10735, 10772, 10809, 10846, 10883, 10920, 10957, 10994, 11031, 11068, 11105, 11142, 11179, 11216, 11253, 11290, 11327, 11364, 11401, 11438, 11475, 11512, 11549, 11586, 11623, 11660, 11697, 11734, 11771, 11808, 11845, 11882, 11919, 11956, 11993, 12030, 12067, 12104, 12141, 12178, 12215, 12252, 12289, 12326, 12363, 12400, 12437, 12474, 12511, 12548, 12585, 12622, 12659, 12696, 12733, 12770, 12807, 12844, 12881, 12918, 12955, 12992, 13029, 13066, 13103, 13140, 13177, 13214, 13251, 13288, 13325, 13362, 13399, 13436, 13473, 13510, 13547, 13584, 13621, 13658, 13695, 13732, 13769, 13806, 13843, 13880, 13917, 13954, 13991, 14028, 14065, 14102, 14139, 14176, 14213, 14250, 14287, 14324, 14361, 14398, 14435, 14472, 14509, 14546, 14583, 14620, 14657, 14694, 14731, 14768, 14805, 14842, 14879, 14916, 14953, 14990, 15027, 15064, 15101, 15138, 15175, 15212, 15249, 15286, 15323, 15360, 15397, 15434, 15471, 15508, 15545, 15582, 15619, 15656, 15693, 15730, 15767, 15804, 15841, 15878, 15915, 15952, 15989, 16026, 16063, 16100, 16137, 16174, 16211, 16248, 16285, 16322, 16359, 16396, 16433, 16470, 16507, 16544, 16581, 16618, 16655, 16692, 16729, 16766, 16803, 16840, 16877, 16914, 16951, 16988, 17025, 17062, 17099, 17136, 17173, 17210, 17247, 17284, 17321, 17358, 17395, 17432, 17469, 17506, 17543, 17580, 17617, 17654, 17691, 17728, 17765, 17802, 17839, 17876, 17913, 17950, 17987, 18024, 18061, 18098, 18135, 18172, 18209, 18246, 18283, 18320, 18357, 18394, 18431, 18468, 18505, 18542, 18579, 18616, 18653, 18690, 18727, 18764, 18801, 18838, 18875, 18912, 18949, 18986, 19023, 19060, 19097, 19134, 19171, 19208, 19245, 19282, 19319, 19356, 19393, 19430, 19467, 19504, 19541, 19578, 19615, 19652, 19689, 19726, 19763, 19800, 19837, 19874, 19911, 19948, 19985, 20022, 20059, 20096, 20133, 20170, 20207, 20244, 20281, 20318, 20355, 20392, 20429, 20466, 20503, 20540, 20577, 20614, 20651, 20688, 20725, 20762, 20799, 20836, 20873, 20910, 20947, 20984, 21021, 21058, 21095, 21132, 21169, 21206, 21243, 21280, 21317, 21354, 21391, 21428, 21465, 21502, 21539, 21576, 21613, 21650, 21687, 21724, 21761, 21798, 21835, 21872, 21909, 21946, 21983, 22020, 22057, 22094, 22131, 22168, 22205, 22242, 22279, 22316, 22353, 22390, 22427, 22464, 22501, 22538, 22575, 22612, 22649, 22686, 22723, 22760, 22797, 22834, 22871, 22908, 22945, 22982, 23019, 23056, 23093, 23130, 23167, 23204, 23241, 23278, 23315, 23352, 23389, 23426, 23463, 23500, 23537, 23574, 23611, 23648, 23685, 23722, 23759, 23796, 23833, 23870, 23907, 23944, 23981, 24018, 24055, 24092, 24129, 24166, 24203, 24240, 24277, 24314, 24351, 24388, 24425, 24462, 24499, 24536, 24573, 24610, 24647, 24684, 24721, 24758, 24795, 24832, 24869, 24906, 24943, 24980, 25017, 25054, 25091, 25128, 25165, 25202, 25239, 25276, 25313, 25350, 25387, 25424, 25461, 25498, 25535, 25572, 25609, 25646, 25683, 25720, 25757, 25794, 25831, 25868, 25905, 25942, 25979, 26016, 26053, 26090, 26127, 26164, 26201, 26238, 26275, 26312, 26349, 26386, 26423, 26460, 26497, 26534, 26571, 26608, 26645, 26682, 26719, 26756, 26793, 26830, 26867, 26904, 26941, 26978, 27015, 27052, 27089, 27126, 27163, 27200, 27237, 27274, 27311, 27348, 27385, 27422, 27459, 27496, 27533, 27570, 27607, 27644, 27681, 27718, 27755, 27792, 27829, 27866, 27903, 27940, 27977, 28014, 28051, 28088, 28125, 28162, 28199, 28236, 28273, 28310, 28347, 28384, 28421, 28458, 28495, 28532, 28569, 28606, 28643, 28680, 28717, 28754, 28791, 28828, 28865, 28902, 28939, 28976, 29013, 29050, 29087, 29124, 29161, 29198, 29235, 29272, 29309, 29346, 29383, 29420, 29457, 29494, 29531, 29568, 29605, 29642, 29679, 29716, 29753, 29790, 29827, 29864, 29901, 29938, 29975, 30012, 30049, 30086, 30123, 30160, 30197, 30234, 30271, 30308, 30345, 30382, 30419, 30456, 30493, 30530, 30567, 30604, 30641, 30678, 30715, 30752, 30789, 30826, 30863, 30900, 30937, 30974, 31011, 31048, 31085, 31122, 31159, 31196, 31233, 31270, 31307, 31344, 31381, 31418, 31455, 31492, 31529, 31566, 31603, 31640, 31677, 31714, 31751, 31788, 31825, 31862, 31899, 31936, 31973, 32010, 32047, 32084, 32121, 32158, 32195, 32232, 32269, 32306, 32343, 32380, 32417, 32454, 32491, 32528, 32565, 32602, 32639, 32676, 32713, 32750, 32787, 32824, 32861, 32898, 32935, 32972, 33009, 33046, 33083, 33120, 33157, 33194, 33231, 33268, 33305, 33342, 33379, 33416, 33453, 33490, 33527, 33564, 33601, 33638, 33675, 33712, 33749, 33786, 33823, 33860, 33897, 33934, 33971, 34008, 34045, 34082, 34119, 34156, 34193, 34230, 34267, 34304, 34341, 34378, 34415, 34452, 34489, 34526, 34563, 34600, 34637, 34674, 34711, 34748, 34785, 34822, 34859, 34896, 34933, 34970, 35007, 35044, 35081, 35118, 35155, 35192, 35229, 35266, 35303, 35340, 35377, 35414, 35451, 35488, 35525, 35562, 35599, 35636, 35673, 35710, 35747, 35784, 35821, 35858, 35895, 35932, 35969, 36006, 36043, 36080, 36117, 36154, 36191, 36228, 36265, 36302, 36339, 36376, 36413, 36450, 36487, 36524, 36561, 36598, 36635, 36672, 36709, 36746, 36783, 36820, 36857, 36894, 36931, 36968]
+
+---- cursor::tests::advance_walks_every_posting_across_block_boundaries stdout ----
+
+thread 'cursor::tests::advance_walks_every_posting_across_block_boundaries' (12842598) panicked at crates/core/src/cursor.rs:270:9:
+assertion `left == right` failed
+  left: Some(3364)
+ right: Some(262)
+
+---- cursor::tests::advance_to_never_moves_backwards stdout ----
+
+thread 'cursor::tests::advance_to_never_moves_backwards' (12842597) panicked at crates/core/src/cursor.rs:297:9:
+assertion `left == right` failed: cursor moved back
+  left: Some(385)
+ right: Some(200)
+
+---- cursor::tests::a_long_skip_decodes_only_the_landing_block stdout ----
+
+thread 'cursor::tests::a_long_skip_decodes_only_the_landing_block' (12842594) panicked at crates/core/src/cursor.rs:318:9:
+assertion `left == right` failed
+  left: Some(1153)
+ right: Some(389)
+
+---- cursor::tests::advance_to_matches_a_linear_scan_on_every_target stdout ----
+
+thread 'cursor::tests::advance_to_matches_a_linear_scan_on_every_target' (12842596) panicked at crates/core/src/cursor.rs:288:13:
+assertion `left == right` failed: target 255
+  left: Some(256)
+ right: Some(288)
+
+---- searcher::tests::documents_matching_more_clauses_rank_higher stdout ----
+
+thread 'searcher::tests::documents_matching_more_clauses_rank_higher' (12842715) panicked at crates/core/src/searcher.rs:489:9:
+assertion `left == right` failed: d2 has both terms and must come first
+  left: "d1"
+ right: "d2"
+
+---- searcher::tests::excluded_terms_are_removed_from_the_results stdout ----
+
+thread 'searcher::tests::excluded_terms_are_removed_from_the_results' (12842716) panicked at crates/core/src/searcher.rs:471:49:
+called `Option::unwrap()` on a `None` value
+
+---- searcher::tests::phrases_require_adjacency_in_the_right_order stdout ----
+
+thread 'searcher::tests::phrases_require_adjacency_in_the_right_order' (12842720) panicked at crates/core/src/searcher.rs:471:49:
+called `Option::unwrap()` on a `None` value
+
+---- searcher::tests::required_terms_intersect stdout ----
+
+thread 'searcher::tests::required_terms_intersect' (12842725) panicked at crates/core/src/searcher.rs:494:9:
+assertion `left == right` failed
+  left: []
+ right: ["d2"]
+
+---- service::tests::queries_keep_being_answered_while_the_index_is_rebuilt stdout ----
+
+thread 'service::tests::queries_keep_being_answered_while_the_index_is_rebuilt' (12842736) panicked at crates/core/src/service.rs:286:9:
+readers never got to run
+
+---- searcher::tests::pruning_can_be_turned_off_without_changing_the_ranking stdout ----
+
+thread 'searcher::tests::pruning_can_be_turned_off_without_changing_the_ranking' (12842722) panicked at crates/core/src/searcher.rs:673:9:
+assertion `left == right` failed
+  left: [0, 288, 128, 32, 4, 100, 144, 64, 36, 196]
+ right: [0, 512, 800, 1152, 1568, 2048, 2592, 288, 128, 32]
+
+---- searcher::tests::pruning_and_exhaustive_scoring_return_the_same_ranking stdout ----
+
+thread 'searcher::tests::pruning_and_exhaustive_scoring_return_the_same_ranking' (12842721) panicked at crates/core/src/searcher.rs:600:21:
+assertion `left == right` failed: `term0` limit 1: different ranking
+  left: 81
+ right: 3364
+
+---- searcher::tests::pruning_holds_under_retuned_ranking_parameters stdout ----
+
+thread 'searcher::tests::pruning_holds_under_retuned_ranking_parameters' (12842723) panicked at crates/core/src/searcher.rs:632:13:
+assertion `left == right` failed: k1=2 b=0.3 changed the ranking
+  left: [0, 256, 144, 16, 64, 400, 576, 784, 162, 200]
+ right: [0, 256, 144, 16, 64, 4624, 5776, 15376, 1024, 1296]
+
+
+failures:
+    codec::tests::decoding_more_values_than_encoded_returns_what_exists
+    codec::tests::delta_encoding_beats_fixed_width_on_dense_lists
+    codec::tests::sorted_sequences_round_trip
+    cursor::tests::a_long_skip_decodes_only_the_landing_block
+    cursor::tests::advance_to_matches_a_linear_scan_on_every_target
+    cursor::tests::advance_to_never_moves_backwards
+    cursor::tests::advance_walks_every_posting_across_block_boundaries
+    searcher::tests::documents_matching_more_clauses_rank_higher
+    searcher::tests::excluded_terms_are_removed_from_the_results
+    searcher::tests::phrases_require_adjacency_in_the_right_order
+    searcher::tests::pruning_and_exhaustive_scoring_return_the_same_ranking
+    searcher::tests::pruning_can_be_turned_off_without_changing_the_ranking
+    searcher::tests::pruning_holds_under_retuned_ranking_parameters
+    searcher::tests::required_terms_intersect
+    service::tests::queries_keep_being_answered_while_the_index_is_rebuilt
+
+test result: FAILED. 123 passed; 15 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.67s
+
+error: test failed, to rerun pass `-p farol-core --lib`
+
+*** result: Failure(101)

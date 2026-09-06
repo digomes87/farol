@@ -1,0 +1,26 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::term_upper_bound -> f32 with 0.0
+@@ -77,22 +77,17 @@
+     }
+ 
+     pub fn is_exhausted(&self) -> bool {
+         self.doc().is_none()
+     }
+ 
+     /// Highest score this term can contribute to *any* document.
+     pub fn term_upper_bound(&self) -> f32 {
+-        self.bm25.score(
+-            self.term.max_tf(),
+-            self.term.min_len(),
+-            self.avg_doc_len,
+-            self.idf,
+-        )
++        0.0 /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Highest score this term can contribute to a document *in the current
+     /// block*.
+     ///
+     /// Tighter than the term-wide bound, because a block covers a narrow slice
+     /// of the collection — which is exactly what makes block-max pruning skip
+     /// more than plain WAND.

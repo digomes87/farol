@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace < with == in gallop
+@@ -214,17 +214,17 @@
+     while low + step < postings.len() && postings[low + step].doc < target {
+         low += step;
+         step *= 2;
+     }
+     let high = (low + step).min(postings.len());
+ 
+     low + postings[low..high]
+         .binary_search_by(|p| {
+-            if p.doc < target {
++            if p.doc == /* ~ changed by cargo-mutants ~ */ target {
+                 std::cmp::Ordering::Less
+             } else {
+                 std::cmp::Ordering::Greater
+             }
+         })
+         .unwrap_or_else(|insertion| insertion)
+ }
+ 

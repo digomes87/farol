@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace < with == in BlockCursor<'a>::load_block
+@@ -50,17 +50,17 @@
+         };
+         cursor.load_block(0);
+         cursor
+     }
+ 
+     fn load_block(&mut self, block: usize) {
+         self.block = block;
+         self.at = 0;
+-        self.decoded = if block < self.term.blocks().len() {
++        self.decoded = if block == /* ~ changed by cargo-mutants ~ */ self.term.blocks().len() {
+             self.term.decode_block(block)
+         } else {
+             Vec::new()
+         };
+     }
+ 
+     /// Document the cursor points at, or `None` once exhausted.
+     pub fn doc(&self) -> Option<DocId> {

@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace < with > in BlockCursor<'a>::advance_to
+@@ -169,17 +169,17 @@
+         if self.doc().is_some_and(|doc| doc >= target) {
+             return self.doc();
+         }
+ 
+         // Walk the block index. Nothing here is decoded: one integer per block.
+         if self.block_last_doc().is_some_and(|last| last < target) {
+             let mut block = self.block + 1;
+             let blocks = self.term.blocks();
+-            while block < blocks.len() && blocks[block].last_doc < target {
++            while block > /* ~ changed by cargo-mutants ~ */ blocks.len() && blocks[block].last_doc < target {
+                 block += 1;
+             }
+             if block >= blocks.len() {
+                 self.load_block(blocks.len());
+                 return None;
+             }
+             self.load_block(block);
+         }

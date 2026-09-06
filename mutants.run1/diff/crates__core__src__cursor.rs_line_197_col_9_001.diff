@@ -1,0 +1,26 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::advance -> Option<DocId> with Some(Default::default())
+@@ -189,22 +189,17 @@
+             let next = self.block + 1;
+             self.load_block(next);
+         }
+         self.doc()
+     }
+ 
+     /// Moves one posting forward, crossing into the next block if needed.
+     pub fn advance(&mut self) -> Option<DocId> {
+-        self.at += 1;
+-        if self.at >= self.decoded.len() {
+-            let next = self.block + 1;
+-            self.load_block(next);
+-        }
+-        self.doc()
++        Some(Default::default()) /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ /// Index of the first posting `>= target` at or after `from`, found by
+ /// exponentially widening a window and then bisecting it.
+ fn gallop(postings: &[Posting], from: usize, target: DocId) -> usize {
+     if from >= postings.len() {
+         return postings.len();

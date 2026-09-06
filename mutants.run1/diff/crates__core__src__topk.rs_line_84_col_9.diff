@@ -1,0 +1,21 @@
+--- crates/core/src/topk.rs
++++ replace TopK::would_accept -> bool with true
+@@ -76,17 +76,17 @@
+             0.0
+         } else {
+             self.heap.peek().map_or(0.0, |worst| worst.score)
+         }
+     }
+ 
+     /// Returns whether a document scoring `score` could enter the result set.
+     pub fn would_accept(&self, score: f32) -> bool {
+-        self.heap.len() < self.k || score > self.threshold()
++        true /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Offers a scored document, keeping it only if it belongs in the top `k`.
+     pub fn offer(&mut self, doc: DocId, score: f32) {
+         if self.k == 0 {
+             return;
+         }
+         let candidate = Candidate { doc, score };

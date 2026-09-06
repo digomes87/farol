@@ -1,0 +1,21 @@
+--- crates/core/src/codec.rs
++++ replace & with ^ in read_varint
+@@ -39,17 +39,17 @@
+ /// A truncated or over-long sequence yields `(0, bytes.len())`: the decoder
+ /// never reads past the slice and never loops forever on malformed input, which
+ /// matters because these bytes come from a file on disk.
+ pub fn read_varint(bytes: &[u8]) -> (u32, usize) {
+     let mut value: u32 = 0;
+     let mut shift = 0;
+     for (idx, &byte) in bytes.iter().enumerate() {
+         value |= u32::from(byte & 0x7F) << shift;
+-        if byte & 0x80 == 0 {
++        if byte ^ /* ~ changed by cargo-mutants ~ */ 0x80 == 0 {
+             return (value, idx + 1);
+         }
+         shift += 7;
+         if shift >= 35 {
+             break;
+         }
+     }
+     (0, bytes.len())

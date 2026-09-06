@@ -1,0 +1,32 @@
+--- crates/core/src/topk.rs
++++ replace <impl Ord for Candidate>::cmp -> Ordering with Default::default()
+@@ -26,28 +26,17 @@
+     score: f32,
+ }
+ 
+ impl Eq for Candidate {}
+ 
+ impl Ord for Candidate {
+     fn cmp(&self, other: &Self) -> Ordering {
+         // Reversed on score so the heap root is the lowest scoring candidate.
+-        other
+-            .score
+-            .partial_cmp(&self.score)
+-            .unwrap_or_else(|| match (self.score.is_nan(), other.score.is_nan()) {
+-                (true, false) => Ordering::Less,
+-                (false, true) => Ordering::Greater,
+-                _ => Ordering::Equal,
+-            })
+-            // On a tie the *larger* document id sorts first, so it is the one
+-            // evicted: ties resolve towards the lower id, matching the order a
+-            // full sort produces.
+-            .then(self.doc.cmp(&other.doc))
++        Default::default() /* ~ changed by cargo-mutants ~ */
+     }
+ }
+ 
+ impl PartialOrd for Candidate {
+     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+         Some(self.cmp(other))
+     }
+ }

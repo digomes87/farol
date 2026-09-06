@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::is_exhausted -> bool with false
+@@ -72,17 +72,17 @@
+         self.decoded.get(self.at).map_or(0, Posting::tf)
+     }
+ 
+     pub fn idf(&self) -> f32 {
+         self.idf
+     }
+ 
+     pub fn is_exhausted(&self) -> bool {
+-        self.doc().is_none()
++        false /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Highest score this term can contribute to *any* document.
+     pub fn term_upper_bound(&self) -> f32 {
+         self.bm25.score(
+             self.term.max_tf(),
+             self.term.min_len(),
+             self.avg_doc_len,

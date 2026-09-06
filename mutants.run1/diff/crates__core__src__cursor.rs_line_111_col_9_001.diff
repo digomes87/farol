@@ -1,0 +1,22 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::block_covering -> Option<usize> with Some(0)
+@@ -103,18 +103,17 @@
+         })
+     }
+ 
+     /// First block at or after the current one that can contain `doc`.
+     ///
+     /// Walks block metadata only — no decoding — which is what lets the pruning
+     /// loop ask about a document the cursor has not reached yet.
+     fn block_covering(&self, doc: DocId) -> Option<usize> {
+-        let blocks = self.term.blocks();
+-        (self.block..blocks.len()).find(|&idx| blocks[idx].last_doc >= doc)
++        Some(0) /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Bound on this term's contribution to `doc`, taken from the block that
+     /// would contain it.
+     ///
+     /// Summing the *current* block's bound instead would be wrong whenever a
+     /// cursor still sits behind `doc`: the document lives in a later block,
+     /// whose bound may be higher, and the pruning decision would rest on an

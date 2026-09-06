@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace *= with /= in gallop
+@@ -208,17 +208,17 @@
+ fn gallop(postings: &[Posting], from: usize, target: DocId) -> usize {
+     if from >= postings.len() {
+         return postings.len();
+     }
+     let mut step = 1;
+     let mut low = from;
+     while low + step < postings.len() && postings[low + step].doc < target {
+         low += step;
+-        step *= 2;
++        step /= /* ~ changed by cargo-mutants ~ */ 2;
+     }
+     let high = (low + step).min(postings.len());
+ 
+     low + postings[low..high]
+         .binary_search_by(|p| {
+             if p.doc < target {
+                 std::cmp::Ordering::Less
+             } else {

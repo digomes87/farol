@@ -1,0 +1,31 @@
+--- crates/core/src/codec.rs
++++ replace decode_plain -> (Vec<u32>, usize) with (vec![0], 0)
+@@ -88,27 +88,17 @@
+ pub fn encode_plain(values: &[u32], out: &mut Vec<u8>) {
+     for &value in values {
+         write_varint(value, out);
+     }
+ }
+ 
+ /// Decodes `count` plain varints, returning them and the bytes consumed.
+ pub fn decode_plain(bytes: &[u8], count: usize) -> (Vec<u32>, usize) {
+-    let mut values = Vec::with_capacity(count);
+-    let mut consumed = 0;
+-    for _ in 0..count {
+-        if consumed >= bytes.len() {
+-            break;
+-        }
+-        let (value, used) = read_varint(&bytes[consumed..]);
+-        consumed += used;
+-        values.push(value);
+-    }
+-    (values, consumed)
++    (vec![0], 0) /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+ 
+     #[test]
+     fn varints_round_trip_across_every_size_boundary() {

@@ -1,0 +1,391 @@
+
+*** crates/core/src/cursor.rs:214:39: replace && with || in gallop
+
+*** mutation diff:
+--- crates/core/src/cursor.rs
++++ replace && with || in gallop
+@@ -206,17 +206,17 @@
+ /// Index of the first posting `>= target` at or after `from`, found by
+ /// exponentially widening a window and then bisecting it.
+ fn gallop(postings: &[Posting], from: usize, target: DocId) -> usize {
+     if from >= postings.len() {
+         return postings.len();
+     }
+     let mut step = 1;
+     let mut low = from;
+-    while low + step < postings.len() && postings[low + step].doc < target {
++    while low + step < postings.len() || /* ~ changed by cargo-mutants ~ */ postings[low + step].doc < target {
+         low += step;
+         step *= 2;
+     }
+     let high = (low + step).min(postings.len());
+ 
+     low + postings[low..high]
+         .binary_search_by(|p| {
+             if p.doc < target {
+
+
+*** /Users/diegogo/.rustup/toolchains/stable-aarch64-apple-darwin/bin/cargo test --no-run --verbose --package=farol-core@0.1.0
+       Fresh unicode-ident v1.0.24
+       Fresh cfg-if v1.0.4
+       Fresh either v1.18.0
+       Fresh autocfg v1.5.1
+       Fresh anstyle v1.0.14
+       Fresh proc-macro2 v1.0.107
+       Fresh tinyvec_macros v0.1.1
+       Fresh regex-syntax v0.8.11
+       Fresh quote v1.0.47
+       Fresh libc v0.2.189
+       Fresh serde_core v1.0.229
+       Fresh crossbeam-utils v0.8.23
+       Fresh zmij v1.0.23
+       Fresh itoa v1.0.18
+       Fresh plotters-backend v0.3.7
+       Fresh clap_lex v1.1.0
+       Fresh ciborium-io v0.2.2
+       Fresh memchr v2.8.3
+       Fresh tinyvec v1.13.2
+       Fresh regex-automata v0.4.18
+       Fresh itertools v0.10.5
+       Fresh syn v3.0.5
+       Fresh syn v2.0.119
+       Fresh crossbeam-epoch v0.9.21
+       Fresh num-traits v0.2.19
+       Fresh errno v0.3.14
+       Fresh clap_builder v4.6.6
+       Fresh plotters-svg v0.3.7
+       Fresh serde_json v1.0.151
+       Fresh bitflags v2.13.1
+       Fresh same-file v1.0.6
+       Fresh once_cell v1.21.4
+       Fresh cast v0.3.0
+       Fresh memmap2 v0.9.11
+       Fresh is-terminal v0.4.17
+       Fresh unicode-normalization v0.1.25
+       Fresh regex v1.13.1
+       Fresh serde_derive v1.0.229
+       Fresh zerocopy-derive v0.8.56
+       Fresh crossbeam-deque v0.8.8
+       Fresh thiserror-impl v2.0.20
+       Fresh clap v4.6.6
+       Fresh plotters v0.3.7
+       Fresh rustix v1.1.4
+       Fresh criterion-plot v0.5.0
+       Fresh walkdir v2.5.0
+       Fresh getrandom v0.4.3
+       Fresh oorandom v11.1.5
+       Fresh anes v0.1.6
+       Fresh fastrand v2.5.0
+       Fresh serde v1.0.229
+       Fresh zerocopy v0.8.56
+       Fresh rayon-core v1.13.0
+       Fresh thiserror v2.0.20
+       Fresh tempfile v3.27.0
+       Fresh half v2.7.1
+       Fresh rayon v1.12.0
+       Fresh bincode v1.3.3
+       Fresh tinytemplate v1.2.1
+       Fresh ciborium-ll v0.2.2
+       Dirty farol-core v0.1.0 (/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/crates/core): the file `crates/core/src/cursor.rs` has changed (1788707525.847995453s, 2s after last build at 1788707523.850462711s)
+   Compiling farol-core v0.1.0 (/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/crates/core)
+       Fresh ciborium v0.2.2
+       Fresh criterion v0.5.1
+     Running `/Users/diegogo/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc --crate-name farol_core --edition=2021 crates/core/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 -C split-debuginfo=unpacked --warn=unexpected_cfgs --check-cfg 'cfg(loom)' --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=fbd402c5829ccff0 -C extra-filename=-372b15c76dddf5b2 --out-dir /private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps -C incremental=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/incremental -L dependency=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps --extern bincode=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libbincode-95c7ea5c0ec9a36e.rlib --extern criterion=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libcriterion-7ad3f0c1d4488ac6.rlib --extern memmap2=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libmemmap2-1b266ad38812c5e6.rlib --extern rayon=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/librayon-a880cf08b47986ad.rlib --extern serde=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libserde-dc473168293d285a.rlib --extern tempfile=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libtempfile-ca1a264b2b376e63.rlib --extern thiserror=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libthiserror-8a11e7add1c8cf69.rlib --extern unicode_normalization=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libunicode_normalization-fc66067d423c21c9.rlib`
+     Running `/Users/diegogo/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc --crate-name farol_core --edition=2021 crates/core/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 -C split-debuginfo=unpacked --warn=unexpected_cfgs --check-cfg 'cfg(loom)' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=4d1102f362dae130 -C extra-filename=-7996c1b4355c7c9e --out-dir /private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps -C incremental=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/incremental -L dependency=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps --extern bincode=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libbincode-95c7ea5c0ec9a36e.rmeta --extern memmap2=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libmemmap2-1b266ad38812c5e6.rmeta --extern rayon=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/librayon-a880cf08b47986ad.rmeta --extern serde=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libserde-dc473168293d285a.rmeta --extern thiserror=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libthiserror-8a11e7add1c8cf69.rmeta --extern unicode_normalization=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libunicode_normalization-fc66067d423c21c9.rmeta`
+     Running `/Users/diegogo/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc --crate-name relevance --edition=2021 crates/core/tests/relevance.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 -C split-debuginfo=unpacked --warn=unexpected_cfgs --check-cfg 'cfg(loom)' --test --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=367d6d9188bb39a6 -C extra-filename=-5da9427daa1bc2eb --out-dir /private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps -C incremental=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/incremental -L dependency=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps --extern bincode=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libbincode-95c7ea5c0ec9a36e.rlib --extern criterion=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libcriterion-7ad3f0c1d4488ac6.rlib --extern farol_core=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libfarol_core-7996c1b4355c7c9e.rlib --extern memmap2=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libmemmap2-1b266ad38812c5e6.rlib --extern rayon=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/librayon-a880cf08b47986ad.rlib --extern serde=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libserde-dc473168293d285a.rlib --extern tempfile=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libtempfile-ca1a264b2b376e63.rlib --extern thiserror=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libthiserror-8a11e7add1c8cf69.rlib --extern unicode_normalization=/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/libunicode_normalization-fc66067d423c21c9.rlib`
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.77s
+  Executable `/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/farol_core-372b15c76dddf5b2`
+  Executable `/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/relevance-5da9427daa1bc2eb`
+
+*** result: Success
+
+*** /Users/diegogo/.rustup/toolchains/stable-aarch64-apple-darwin/bin/cargo test --verbose --package=farol-core@0.1.0
+       Fresh unicode-ident v1.0.24
+       Fresh cfg-if v1.0.4
+       Fresh either v1.18.0
+       Fresh autocfg v1.5.1
+       Fresh proc-macro2 v1.0.107
+       Fresh itoa v1.0.18
+       Fresh memchr v2.8.3
+       Fresh quote v1.0.47
+       Fresh libc v0.2.189
+       Fresh serde_core v1.0.229
+       Fresh crossbeam-utils v0.8.23
+       Fresh zmij v1.0.23
+       Fresh plotters-backend v0.3.7
+       Fresh anstyle v1.0.14
+       Fresh clap_lex v1.1.0
+       Fresh tinyvec_macros v0.1.1
+       Fresh ciborium-io v0.2.2
+       Fresh regex-syntax v0.8.11
+       Fresh itertools v0.10.5
+       Fresh bitflags v2.13.1
+       Fresh syn v3.0.5
+       Fresh syn v2.0.119
+       Fresh crossbeam-epoch v0.9.21
+       Fresh serde_json v1.0.151
+       Fresh regex-automata v0.4.18
+       Fresh errno v0.3.14
+       Fresh tinyvec v1.13.2
+       Fresh num-traits v0.2.19
+       Fresh plotters-svg v0.3.7
+       Fresh clap_builder v4.6.6
+       Fresh cast v0.3.0
+       Fresh same-file v1.0.6
+       Fresh once_cell v1.21.4
+       Fresh memmap2 v0.9.11
+       Fresh getrandom v0.4.3
+       Fresh is-terminal v0.4.17
+       Fresh oorandom v11.1.5
+       Fresh serde_derive v1.0.229
+       Fresh zerocopy-derive v0.8.56
+       Fresh crossbeam-deque v0.8.8
+       Fresh thiserror-impl v2.0.20
+       Fresh criterion-plot v0.5.0
+       Fresh unicode-normalization v0.1.25
+       Fresh clap v4.6.6
+       Fresh regex v1.13.1
+       Fresh walkdir v2.5.0
+       Fresh plotters v0.3.7
+       Fresh rustix v1.1.4
+       Fresh anes v0.1.6
+       Fresh fastrand v2.5.0
+       Fresh serde v1.0.229
+       Fresh zerocopy v0.8.56
+       Fresh rayon-core v1.13.0
+       Fresh thiserror v2.0.20
+       Fresh tempfile v3.27.0
+       Fresh half v2.7.1
+       Fresh rayon v1.12.0
+       Fresh bincode v1.3.3
+       Fresh tinytemplate v1.2.1
+       Fresh ciborium-ll v0.2.2
+       Fresh ciborium v0.2.2
+       Fresh criterion v0.5.1
+       Fresh farol-core v0.1.0 (/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/crates/core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running `/private/var/folders/8s/qhxsv9394vx11zlkpyxg7wlw0000gn/T/cargo-mutants-farol-3Js0fM.tmp/target/debug/deps/farol_core-372b15c76dddf5b2`
+
+running 138 tests
+test bm25::tests::idf_falls_as_the_term_becomes_common ... ok
+test bm25::tests::k1_zero_makes_term_frequency_binary ... ok
+test bm25::tests::parameters_are_clamped_to_a_valid_range ... ok
+test bm25::tests::idf_never_goes_negative_for_ubiquitous_terms ... ok
+test bm25::tests::short_documents_outrank_long_ones_for_the_same_match ... ok
+test bm25::tests::absent_terms_and_empty_indexes_score_zero ... ok
+test bm25::tests::b_zero_disables_length_normalisation ... ok
+test analyzer::tests::stem_leaves_short_words_untouched ... ok
+test bm25::tests::term_frequency_saturates ... ok
+test analyzer::tests::stem_is_idempotent ... ok
+test analyzer::tests::split_words_yields_byte_spans_of_the_original_text ... ok
+test analyzer::tests::stem_collapses_portuguese_plurals ... ok
+test codec::tests::an_unterminated_varint_does_not_read_past_the_slice ... ok
+test analyzer::tests::raw_analyzer_preserves_every_token ... ok
+test codec::tests::plain_values_round_trip_without_the_sorted_assumption ... ok
+test codec::tests::a_single_value_and_an_empty_slice_are_handled ... ok
+test codec::tests::truncated_input_stops_instead_of_looping_or_panicking ... ok
+test codec::tests::decoding_more_values_than_encoded_returns_what_exists ... ok
+test codec::tests::varint_length_grows_with_magnitude ... ok
+test codec::tests::delta_encoding_beats_fixed_width_on_dense_lists ... ok
+test analyzer::tests::normalize_strips_accents_and_case ... ok
+test codec::tests::sorted_sequences_round_trip ... ok
+test codec::tests::varints_round_trip_across_every_size_boundary ... ok
+test analyzer::tests::offsets_point_at_the_original_word ... ok
+test analyzer::tests::analyze_keeps_positions_across_removed_stopwords ... ok
+test analyzer::tests::indexing_and_query_produce_the_same_terms ... ok
+test cursor::tests::a_new_cursor_points_at_the_first_document ... ok
+test cursor::tests::remaining_counts_the_postings_still_ahead ... FAILED
+test cursor::tests::skipping_past_the_end_exhausts_the_cursor ... ok
+test cursor::tests::advance_to_matches_a_linear_scan_on_every_target ... FAILED
+test engine::tests::indexing_a_missing_directory_reports_the_path ... ok
+test cursor::tests::advance_to_never_moves_backwards ... FAILED
+test cursor::tests::a_long_skip_decodes_only_the_landing_block ... FAILED
+test engine::tests::an_unparsable_query_is_an_error_not_an_empty_result ... ok
+test cursor::tests::a_block_bound_is_never_looser_than_the_term_bound ... FAILED
+test cursor::tests::advance_walks_every_posting_across_block_boundaries ... ok
+test index::tests::doc_freq_counts_documents_not_occurrences ... ok
+test engine::tests::crawling_picks_text_files_recursively_and_skips_the_rest ... ok
+test index::tests::avg_doc_len_is_the_mean_term_count ... ok
+test index::tests::compressed_postings_decode_back_to_what_was_indexed ... ok
+test index::tests::empty_index_reports_zero_average_length ... ok
+test index::tests::finish_records_the_score_bounds_of_every_term ... ok
+test index::tests::finish_sorts_posting_lists_by_doc_id ... ok
+test index::tests::merge_renumbers_documents_and_keeps_postings_aligned ... ok
+test index::tests::postings_record_every_position ... ok
+test index::tests::reopening_a_sealed_index_keeps_the_earlier_postings ... ok
+test index::tests::score_bounds_are_refreshed_after_a_merge ... ok
+test index::tests::posting_lists_are_split_into_blocks ... ok
+test index::tests::every_block_carries_its_own_score_bounds ... ok
+test index::tests::compression_shrinks_a_dense_posting_list ... ok
+test engine::tests::a_shared_term_ranks_both_documents ... ok
+test engine::tests::markdown_headings_become_titles ... ok
+test mmap::tests::a_foreign_file_is_rejected ... ok
+test engine::tests::search_reports_the_strategy_it_used ... ok
+test engine::tests::extensions_can_be_restricted ... ok
+test query::tests::a_query_of_only_exclusions_is_rejected ... ok
+test query::tests::a_phrase_can_be_required_or_forbidden ... ok
+test mmap::tests::a_truncated_file_is_rejected_instead_of_read ... ok
+test mmap::tests::a_mapped_index_answers_like_the_one_in_memory ... ok
+test query::tests::a_single_word_phrase_degrades_to_a_term ... ok
+test query::tests::bare_terms_are_optional ... ok
+test query::tests::a_query_of_only_stopwords_is_rejected ... ok
+test query::tests::positive_terms_ignore_exclusions ... ok
+test query::tests::prefixes_set_the_boolean_role ... ok
+test query::tests::quoted_text_becomes_a_phrase_with_relative_offsets ... ok
+test query::tests::unterminated_quote_is_rejected ... ok
+test engine::tests::a_mapped_index_refuses_further_indexing ... ok
+test mmap::tests::an_empty_index_maps_cleanly ... ok
+test query::tests::phrase_offsets_keep_the_gap_left_by_a_stopword ... ok
+test query::tests::queries_are_analyzed_like_documents ... ok
+test mmap::tests::posting_lists_decode_to_the_same_values ... ok
+test engine::tests::an_engine_round_trips_through_a_mapped_index ... ok
+test engine::tests::an_engine_round_trips_through_the_serialised_format_too ... ok
+test searcher::tests::documents_matching_more_clauses_rank_higher ... ok
+test mmap::tests::documents_are_read_straight_from_the_mapping ... ok
+test searcher::tests::excluded_terms_are_removed_from_the_results ... ok
+test searcher::tests::limit_truncates_the_ranking ... ok
+test searcher::tests::optional_terms_match_any_document ... ok
+test searcher::tests::constrained_queries_fall_back_to_exhaustive_evaluation ... ok
+test searcher::tests::phrases_do_not_match_terms_that_are_merely_present ... ok
+test mmap::tests::queries_run_against_a_mapped_index ... ok
+test searcher::tests::phrases_require_adjacency_in_the_right_order ... ok
+test searcher::tests::required_terms_intersect ... ok
+test searcher::tests::scores_are_positive_and_ordered ... ok
+test searcher::tests::searching_an_empty_index_is_not_an_error ... ok
+test searcher::tests::unknown_terms_yield_no_results ... ok
+test engine::tests::search_returns_titles_scores_and_snippets ... ok
+test mmap::tests::score_bounds_survive_the_round_trip ... ok
+test engine::tests::both_formats_return_the_same_results ... ok
+test service::tests::publishing_an_engine_directly_bumps_the_generation ... ok
+test service::tests::a_rebuild_inherits_the_configuration_in_service ... ok
+test service::tests::a_snapshot_keeps_answering_from_the_generation_it_took ... ok
+test mmap::tests::the_dictionary_binary_search_finds_every_term ... ok
+test service::tests::a_new_service_serves_generation_one ... ok
+test snapshot::tests::load_returns_the_current_value ... ok
+test snapshot::tests::a_held_snapshot_survives_replacement ... ok
+test snapshot::tests::store_returns_the_previous_value ... ok
+test snapshot::tests::superseded_values_are_reclaimed_once_readers_are_gone ... ok
+test snapshot::tests::readers_keep_making_progress_while_a_writer_swaps ... FAILED
+test service::tests::reindexing_publishes_the_next_generation ... ok
+test service::tests::queries_keep_being_answered_while_the_index_is_rebuilt ... ok
+test snapshot::tests::reclamation_is_skipped_rather_than_waited_for ... ok
+test snapshot::tests::concurrent_writers_leave_one_of_their_values_current ... ok
+test snapshot::tests::the_cell_drops_its_value_exactly_once ... ok
+test snippet::tests::documents_without_a_visible_match_fall_back_to_the_head ... ok
+test snippet::tests::markers_are_configurable ... ok
+test service::tests::concurrent_rebuilds_are_serialised_and_numbered_without_gaps ... ok
+test snippet::tests::short_documents_are_returned_whole ... ok
+test snippet::tests::snippets_are_single_line ... ok
+test snippet::tests::the_window_moves_to_where_the_matches_are ... ok
+test snippet::tests::matched_words_are_wrapped_in_the_markers ... ok
+test snippet::tests::the_window_prefers_the_most_distinct_terms ... ok
+test source::tests::a_memory_source_can_still_be_extended ... ok
+test source::tests::an_edit_is_sealed_back_even_when_the_caller_returns_early ... ok
+test snippet::tests::windows_never_split_a_multibyte_character ... ok
+test service::tests::a_mapped_index_can_be_adopted_without_rebuilding_it ... ok
+test store::tests::a_foreign_file_is_rejected_before_decoding ... ok
+test source::tests::a_mapped_source_refuses_to_be_written_to ... ok
+test topk::tests::fewer_documents_than_k_is_fine ... ok
+test topk::tests::a_zero_sized_collector_keeps_nothing ... ok
+test searcher::tests::pruning_can_be_turned_off_without_changing_the_ranking ... FAILED
+test topk::tests::keeps_only_the_best_k ... ok
+test topk::tests::the_threshold_is_zero_until_it_fills_up ... ok
+test searcher::tests::pruning_and_exhaustive_scoring_return_the_same_ranking ... FAILED
+test store::tests::a_future_format_version_is_reported_clearly ... ok
+test source::tests::both_sources_answer_identically ... ok
+test topk::tests::the_threshold_rises_as_better_documents_arrive ... ok
+test topk::tests::ties_resolve_towards_the_lower_document_id ... ok
+test topk::tests::would_accept_agrees_with_offer ... ok
+test store::tests::an_index_survives_a_round_trip ... ok
+test store::tests::a_reloaded_index_still_answers_queries ... ok
+test store::tests::a_truncated_index_is_a_decode_error_not_a_panic ... ok
+test store::tests::saving_twice_replaces_the_file_and_leaves_no_temporary ... ok
+test searcher::tests::pruning_holds_under_retuned_ranking_parameters ... FAILED
+test engine::tests::parallel_indexing_produces_the_same_ids_as_a_sequential_run ... ok
+test searcher::tests::a_smaller_limit_prunes_more ... FAILED
+test searcher::tests::pruning_scores_far_fewer_documents_than_it_matches ... FAILED
+test searcher::tests::block_max_bounds_skip_whole_blocks ... FAILED
+
+failures:
+
+---- cursor::tests::remaining_counts_the_postings_still_ahead stdout ----
+
+thread 'cursor::tests::remaining_counts_the_postings_still_ahead' (12929384) panicked at crates/core/src/cursor.rs:214:77:
+index out of bounds: the len is 128 but the index is 255
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- cursor::tests::advance_to_matches_a_linear_scan_on_every_target stdout ----
+
+thread 'cursor::tests::advance_to_matches_a_linear_scan_on_every_target' (12929381) panicked at crates/core/src/cursor.rs:214:77:
+index out of bounds: the len is 128 but the index is 255
+
+---- cursor::tests::advance_to_never_moves_backwards stdout ----
+
+thread 'cursor::tests::advance_to_never_moves_backwards' (12929382) panicked at crates/core/src/cursor.rs:214:77:
+index out of bounds: the len is 128 but the index is 255
+
+---- cursor::tests::a_long_skip_decodes_only_the_landing_block stdout ----
+
+thread 'cursor::tests::a_long_skip_decodes_only_the_landing_block' (12929379) panicked at crates/core/src/cursor.rs:214:77:
+index out of bounds: the len is 128 but the index is 255
+
+---- cursor::tests::a_block_bound_is_never_looser_than_the_term_bound stdout ----
+
+thread 'cursor::tests::a_block_bound_is_never_looser_than_the_term_bound' (12929378) panicked at crates/core/src/cursor.rs:214:77:
+index out of bounds: the len is 1 but the index is 1
+
+---- snapshot::tests::readers_keep_making_progress_while_a_writer_swaps stdout ----
+
+thread 'snapshot::tests::readers_keep_making_progress_while_a_writer_swaps' (12929484) panicked at crates/core/src/snapshot.rs:315:9:
+readers never got to run
+
+---- searcher::tests::pruning_can_be_turned_off_without_changing_the_ranking stdout ----
+
+thread 'searcher::tests::pruning_can_be_turned_off_without_changing_the_ranking' (12929458) panicked at crates/core/src/cursor.rs:214:77:
+index out of bounds: the len is 128 but the index is 164
+
+---- searcher::tests::pruning_and_exhaustive_scoring_return_the_same_ranking stdout ----
+
+thread 'searcher::tests::pruning_and_exhaustive_scoring_return_the_same_ranking' (12929457) panicked at crates/core/src/cursor.rs:214:77:
+index out of bounds: the len is 128 but the index is 255
+
+---- searcher::tests::pruning_holds_under_retuned_ranking_parameters stdout ----
+
+thread 'searcher::tests::pruning_holds_under_retuned_ranking_parameters' (12929459) panicked at crates/core/src/cursor.rs:214:77:
+index out of bounds: the len is 128 but the index is 146
+
+---- searcher::tests::a_smaller_limit_prunes_more stdout ----
+
+thread 'searcher::tests::a_smaller_limit_prunes_more' (12929448) panicked at crates/core/src/cursor.rs:214:77:
+index out of bounds: the len is 128 but the index is 128
+
+---- searcher::tests::pruning_scores_far_fewer_documents_than_it_matches stdout ----
+
+thread 'searcher::tests::pruning_scores_far_fewer_documents_than_it_matches' (12929460) panicked at crates/core/src/cursor.rs:214:77:
+index out of bounds: the len is 128 but the index is 128
+
+---- searcher::tests::block_max_bounds_skip_whole_blocks stdout ----
+
+thread 'searcher::tests::block_max_bounds_skip_whole_blocks' (12929449) panicked at crates/core/src/cursor.rs:214:77:
+index out of bounds: the len is 128 but the index is 160
+
+
+failures:
+    cursor::tests::a_block_bound_is_never_looser_than_the_term_bound
+    cursor::tests::a_long_skip_decodes_only_the_landing_block
+    cursor::tests::advance_to_matches_a_linear_scan_on_every_target
+    cursor::tests::advance_to_never_moves_backwards
+    cursor::tests::remaining_counts_the_postings_still_ahead
+    searcher::tests::a_smaller_limit_prunes_more
+    searcher::tests::block_max_bounds_skip_whole_blocks
+    searcher::tests::pruning_and_exhaustive_scoring_return_the_same_ranking
+    searcher::tests::pruning_can_be_turned_off_without_changing_the_ranking
+    searcher::tests::pruning_holds_under_retuned_ranking_parameters
+    searcher::tests::pruning_scores_far_fewer_documents_than_it_matches
+    snapshot::tests::readers_keep_making_progress_while_a_writer_swaps
+
+test result: FAILED. 126 passed; 12 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+
+error: test failed, to rerun pass `-p farol-core --lib`
+
+*** result: Failure(101)

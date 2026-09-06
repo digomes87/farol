@@ -296,12 +296,24 @@ no test noticed:
 cargo mutants -p farol-core --file crates/core/src/bm25.rs
 ```
 
-It is not run in CI (it takes minutes per module), but it is how the weak spots
-above were found. The last sweep of the ranking and cursor modules left eleven
-survivors, all of the same kind: tests that pinned a *direction* rather than a
-*value*, so mutating the arithmetic inside BM25 kept "rarer terms score higher"
-true while the formula was wrong. They are now pinned against the formula
-written out independently in the test.
+It is not run in CI — it takes minutes per module — but it is how the weak spots
+in this suite were found. The first sweep of the ranking and cursor modules
+tested 201 mutants and left 13 alive, nearly all of one kind: tests that pinned
+a *direction* rather than a *value*. "Rarer terms score higher" stays true when
+the IDF expression is mutated, and "short documents outrank long ones" stays
+true when the length ratio becomes a product, so those tests never noticed. The
+formulas are now written out independently in the tests and compared against the
+implementation; `bm25.rs` kills 39 of 39 mutants.
+
+Two of the survivors turned out not to be missing tests at all. `block_upper_bound`
+survived being replaced by a constant because nothing outside the tests called
+it, and a branch in `advance_to` survived having its arithmetic flipped because
+it was unreachable. Both were deleted.
+
+The three that remain are equivalent mutants — a linear instead of a doubling
+step in the galloping search, and two unreachable comparisons — and they are
+documented as such where they live. A mutation score is not meant to reach 100%;
+it is meant to separate "this test is weak" from "this change is not observable".
 
 The tests in [`crates/core/tests/relevance.rs`](crates/core/tests/relevance.rs)
 pin which document must rank first for realistic queries over the sample corpus.

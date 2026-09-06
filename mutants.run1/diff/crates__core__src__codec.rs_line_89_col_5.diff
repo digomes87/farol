@@ -1,0 +1,23 @@
+--- crates/core/src/codec.rs
++++ replace encode_plain with ()
+@@ -81,19 +81,17 @@
+         previous = previous.saturating_add(delta);
+         values.push(previous);
+     }
+     (values, consumed)
+ }
+ 
+ /// Encodes values that are not necessarily sorted, one varint each.
+ pub fn encode_plain(values: &[u32], out: &mut Vec<u8>) {
+-    for &value in values {
+-        write_varint(value, out);
+-    }
++    () /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ /// Decodes `count` plain varints, returning them and the bytes consumed.
+ pub fn decode_plain(bytes: &[u8], count: usize) -> (Vec<u32>, usize) {
+     let mut values = Vec::with_capacity(count);
+     let mut consumed = 0;
+     for _ in 0..count {
+         if consumed >= bytes.len() {

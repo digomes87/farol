@@ -1,0 +1,21 @@
+--- crates/core/src/codec.rs
++++ replace += with -= in decode_plain
+@@ -95,17 +95,17 @@
+ pub fn decode_plain(bytes: &[u8], count: usize) -> (Vec<u32>, usize) {
+     let mut values = Vec::with_capacity(count);
+     let mut consumed = 0;
+     for _ in 0..count {
+         if consumed >= bytes.len() {
+             break;
+         }
+         let (value, used) = read_varint(&bytes[consumed..]);
+-        consumed += used;
++        consumed -= /* ~ changed by cargo-mutants ~ */ used;
+         values.push(value);
+     }
+     (values, consumed)
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     use super::*;

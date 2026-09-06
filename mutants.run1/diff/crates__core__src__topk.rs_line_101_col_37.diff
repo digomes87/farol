@@ -1,0 +1,21 @@
+--- crates/core/src/topk.rs
++++ replace == with != in TopK::offer
+@@ -93,17 +93,17 @@
+         if self.heap.len() < self.k {
+             self.heap.push(candidate);
+             return;
+         }
+         // `Less` means "better" under this reversed ordering. Equality keeps
+         // the incumbent, so ties resolve towards the document seen first —
+         // which, since documents arrive in ascending id order, is the lower id.
+         if let Some(worst) = self.heap.peek() {
+-            if candidate.cmp(worst) == Ordering::Less {
++            if candidate.cmp(worst) != /* ~ changed by cargo-mutants ~ */ Ordering::Less {
+                 self.heap.pop();
+                 self.heap.push(candidate);
+             }
+         }
+     }
+ 
+     /// Consumes the collector, returning the hits best first.
+     pub fn into_sorted(self) -> Vec<Hit> {

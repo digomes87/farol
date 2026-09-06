@@ -1,0 +1,21 @@
+--- crates/core/src/codec.rs
++++ replace | with & in write_varint
+@@ -23,17 +23,17 @@
+ //! assert!(bytes.len() < docs.len() * 4, "compression should pay off");
+ //! assert_eq!(decode_sorted(&bytes, docs.len()).0, docs);
+ //! ```
+ 
+ /// Appends `value` to `out` in LEB128: seven bits per byte, high bit set on
+ /// every byte but the last.
+ pub fn write_varint(mut value: u32, out: &mut Vec<u8>) {
+     while value >= 0x80 {
+-        out.push((value as u8) | 0x80);
++        out.push((value as u8) & /* ~ changed by cargo-mutants ~ */ 0x80);
+         value >>= 7;
+     }
+     out.push(value as u8);
+ }
+ 
+ /// Reads one varint from `bytes`, returning it and how many bytes it used.
+ ///
+ /// A truncated or over-long sequence yields `(0, bytes.len())`: the decoder

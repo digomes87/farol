@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace + with * in gallop
+@@ -212,17 +212,17 @@
+     let mut step = 1;
+     let mut low = from;
+     while low + step < postings.len() && postings[low + step].doc < target {
+         low += step;
+         step *= 2;
+     }
+     let high = (low + step).min(postings.len());
+ 
+-    low + postings[low..high]
++    low * /* ~ changed by cargo-mutants ~ */ postings[low..high]
+         .binary_search_by(|p| {
+             if p.doc < target {
+                 std::cmp::Ordering::Less
+             } else {
+                 std::cmp::Ordering::Greater
+             }
+         })
+         .unwrap_or_else(|insertion| insertion)

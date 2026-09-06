@@ -1,0 +1,169 @@
+crates/core/src/bm25.rs:58:9: replace Bm25::idf -> f32 with 0.0
+crates/core/src/bm25.rs:60:14: replace + with * in Bm25::idf
+crates/core/src/bm25.rs:60:31: replace / with % in Bm25::idf
+crates/core/src/bm25.rs:60:14: replace + with - in Bm25::idf
+crates/core/src/bm25.rs:60:31: replace / with * in Bm25::idf
+crates/core/src/bm25.rs:60:24: replace + with - in Bm25::idf
+crates/core/src/bm25.rs:58:9: replace Bm25::idf -> f32 with -1.0
+crates/core/src/bm25.rs:58:9: replace Bm25::idf -> f32 with 1.0
+crates/core/src/bm25.rs:72:9: replace Bm25::score -> f32 with 0.0
+crates/core/src/bm25.rs:72:9: replace Bm25::score -> f32 with 1.0
+crates/core/src/bm25.rs:72:9: replace Bm25::score -> f32 with -1.0
+crates/core/src/bm25.rs:72:15: replace == with != in Bm25::score
+crates/core/src/bm25.rs:72:35: replace <= with > in Bm25::score
+crates/core/src/bm25.rs:76:33: replace + with - in Bm25::score
+crates/core/src/bm25.rs:76:33: replace + with * in Bm25::score
+crates/core/src/bm25.rs:76:24: replace - with + in Bm25::score
+crates/core/src/bm25.rs:76:24: replace - with / in Bm25::score
+crates/core/src/bm25.rs:76:42: replace * with + in Bm25::score
+crates/core/src/bm25.rs:76:42: replace * with / in Bm25::score
+crates/core/src/bm25.rs:76:60: replace / with % in Bm25::score
+crates/core/src/bm25.rs:77:38: replace / with % in Bm25::score
+crates/core/src/bm25.rs:77:38: replace / with * in Bm25::score
+crates/core/src/bm25.rs:77:13: replace * with + in Bm25::score
+crates/core/src/bm25.rs:77:13: replace * with / in Bm25::score
+crates/core/src/bm25.rs:77:19: replace * with + in Bm25::score
+crates/core/src/bm25.rs:77:30: replace + with - in Bm25::score
+crates/core/src/bm25.rs:77:30: replace + with * in Bm25::score
+crates/core/src/bm25.rs:77:44: replace + with - in Bm25::score
+crates/core/src/bm25.rs:77:44: replace + with * in Bm25::score
+crates/core/src/bm25.rs:77:54: replace * with + in Bm25::score
+crates/core/src/bm25.rs:77:54: replace * with / in Bm25::score
+crates/core/src/codec.rs:30:5: replace write_varint with ()
+crates/core/src/codec.rs:31:32: replace | with & in write_varint
+crates/core/src/codec.rs:31:32: replace | with ^ in write_varint
+crates/core/src/codec.rs:32:15: replace >>= with <<= in write_varint
+crates/core/src/codec.rs:43:5: replace read_varint -> (u32, usize) with (0, 0)
+crates/core/src/codec.rs:43:5: replace read_varint -> (u32, usize) with (0, 1)
+crates/core/src/codec.rs:43:5: replace read_varint -> (u32, usize) with (1, 0)
+crates/core/src/codec.rs:43:5: replace read_varint -> (u32, usize) with (1, 1)
+crates/core/src/codec.rs:46:15: replace |= with &= in read_varint
+crates/core/src/codec.rs:46:41: replace << with >> in read_varint
+crates/core/src/codec.rs:46:33: replace & with | in read_varint
+crates/core/src/codec.rs:46:33: replace & with ^ in read_varint
+crates/core/src/codec.rs:47:24: replace == with != in read_varint
+crates/core/src/codec.rs:47:17: replace & with | in read_varint
+crates/core/src/codec.rs:47:17: replace & with ^ in read_varint
+crates/core/src/codec.rs:48:32: replace + with - in read_varint
+crates/core/src/codec.rs:48:32: replace + with * in read_varint
+crates/core/src/codec.rs:50:15: replace += with -= in read_varint
+crates/core/src/codec.rs:50:15: replace += with *= in read_varint
+crates/core/src/codec.rs:51:18: replace >= with < in read_varint
+crates/core/src/codec.rs:63:5: replace encode_sorted with ()
+crates/core/src/codec.rs:65:28: replace - with + in encode_sorted
+crates/core/src/codec.rs:65:28: replace - with / in encode_sorted
+crates/core/src/codec.rs:72:5: replace decode_sorted -> (Vec<u32>, usize) with (vec![], 0)
+crates/core/src/codec.rs:72:5: replace decode_sorted -> (Vec<u32>, usize) with (vec![0], 0)
+crates/core/src/codec.rs:72:5: replace decode_sorted -> (Vec<u32>, usize) with (vec![], 1)
+crates/core/src/codec.rs:72:5: replace decode_sorted -> (Vec<u32>, usize) with (vec![0], 1)
+crates/core/src/codec.rs:72:5: replace decode_sorted -> (Vec<u32>, usize) with (vec![1], 0)
+crates/core/src/codec.rs:72:5: replace decode_sorted -> (Vec<u32>, usize) with (vec![1], 1)
+crates/core/src/codec.rs:76:21: replace >= with < in decode_sorted
+crates/core/src/codec.rs:80:18: replace += with -= in decode_sorted
+crates/core/src/codec.rs:80:18: replace += with *= in decode_sorted
+crates/core/src/codec.rs:89:5: replace encode_plain with ()
+crates/core/src/codec.rs:96:5: replace decode_plain -> (Vec<u32>, usize) with (vec![], 0)
+crates/core/src/codec.rs:96:5: replace decode_plain -> (Vec<u32>, usize) with (vec![], 1)
+crates/core/src/codec.rs:96:5: replace decode_plain -> (Vec<u32>, usize) with (vec![0], 0)
+crates/core/src/codec.rs:96:5: replace decode_plain -> (Vec<u32>, usize) with (vec![0], 1)
+crates/core/src/codec.rs:96:5: replace decode_plain -> (Vec<u32>, usize) with (vec![1], 0)
+crates/core/src/codec.rs:96:5: replace decode_plain -> (Vec<u32>, usize) with (vec![1], 1)
+crates/core/src/codec.rs:99:21: replace >= with < in decode_plain
+crates/core/src/codec.rs:103:18: replace += with -= in decode_plain
+crates/core/src/codec.rs:103:18: replace += with *= in decode_plain
+crates/core/src/cursor.rs:56:9: replace BlockCursor<'a>::load_block with ()
+crates/core/src/cursor.rs:58:33: replace < with == in BlockCursor<'a>::load_block
+crates/core/src/cursor.rs:58:33: replace < with > in BlockCursor<'a>::load_block
+crates/core/src/cursor.rs:67:9: replace BlockCursor<'a>::doc -> Option<DocId> with None
+crates/core/src/cursor.rs:72:9: replace BlockCursor<'a>::tf -> u32 with 0
+crates/core/src/cursor.rs:72:9: replace BlockCursor<'a>::tf -> u32 with 1
+crates/core/src/cursor.rs:76:9: replace BlockCursor<'a>::idf -> f32 with 0.0
+crates/core/src/cursor.rs:76:9: replace BlockCursor<'a>::idf -> f32 with 1.0
+crates/core/src/cursor.rs:76:9: replace BlockCursor<'a>::idf -> f32 with -1.0
+crates/core/src/cursor.rs:80:9: replace BlockCursor<'a>::is_exhausted -> bool with true
+crates/core/src/cursor.rs:80:9: replace BlockCursor<'a>::is_exhausted -> bool with false
+crates/core/src/cursor.rs:85:9: replace BlockCursor<'a>::term_upper_bound -> f32 with 0.0
+crates/core/src/cursor.rs:85:9: replace BlockCursor<'a>::term_upper_bound -> f32 with 1.0
+crates/core/src/cursor.rs:85:9: replace BlockCursor<'a>::term_upper_bound -> f32 with -1.0
+crates/core/src/cursor.rs:100:9: replace BlockCursor<'a>::block_upper_bound -> f32 with 0.0
+crates/core/src/cursor.rs:100:9: replace BlockCursor<'a>::block_upper_bound -> f32 with 1.0
+crates/core/src/cursor.rs:100:9: replace BlockCursor<'a>::block_upper_bound -> f32 with -1.0
+crates/core/src/cursor.rs:111:9: replace BlockCursor<'a>::block_covering -> Option<usize> with None
+crates/core/src/cursor.rs:111:9: replace BlockCursor<'a>::block_covering -> Option<usize> with Some(1)
+crates/core/src/cursor.rs:112:69: replace >= with < in BlockCursor<'a>::block_covering
+crates/core/src/cursor.rs:123:9: replace BlockCursor<'a>::block_upper_bound_at -> f32 with 0.0
+crates/core/src/cursor.rs:123:9: replace BlockCursor<'a>::block_upper_bound_at -> f32 with 1.0
+crates/core/src/cursor.rs:123:9: replace BlockCursor<'a>::block_upper_bound_at -> f32 with -1.0
+crates/core/src/cursor.rs:136:9: replace BlockCursor<'a>::block_last_doc_at -> Option<DocId> with None
+crates/core/src/cursor.rs:142:9: replace BlockCursor<'a>::block_index -> usize with 0
+crates/core/src/cursor.rs:142:9: replace BlockCursor<'a>::block_index -> usize with 1
+crates/core/src/cursor.rs:147:9: replace BlockCursor<'a>::block_last_doc -> Option<DocId> with None
+crates/core/src/cursor.rs:147:9: replace BlockCursor<'a>::block_last_doc -> Option<DocId> with Some(Default::default())
+crates/core/src/cursor.rs:152:9: replace BlockCursor<'a>::remaining -> usize with 0
+crates/core/src/cursor.rs:152:9: replace BlockCursor<'a>::remaining -> usize with 1
+crates/core/src/cursor.rs:157:30: replace + with - in BlockCursor<'a>::remaining
+crates/core/src/cursor.rs:157:30: replace + with * in BlockCursor<'a>::remaining
+crates/core/src/cursor.rs:160:18: replace + with - in BlockCursor<'a>::remaining
+crates/core/src/cursor.rs:160:18: replace + with * in BlockCursor<'a>::remaining
+crates/core/src/cursor.rs:174:58: replace < with == in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:174:58: replace < with > in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:174:58: replace < with <= in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:175:40: replace + with - in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:175:40: replace + with * in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:177:40: replace && with || in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:177:25: replace < with == in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:177:25: replace < with > in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:177:25: replace < with <= in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:177:66: replace < with == in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:177:66: replace < with > in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:177:66: replace < with <= in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:178:23: replace += with -= in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:180:22: replace >= with < in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:188:20: replace >= with < in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:189:35: replace + with - in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:189:35: replace + with * in BlockCursor<'a>::advance_to
+crates/core/src/cursor.rs:197:17: replace += with -= in BlockCursor<'a>::advance
+crates/core/src/cursor.rs:198:20: replace >= with < in BlockCursor<'a>::advance
+crates/core/src/cursor.rs:199:35: replace + with - in BlockCursor<'a>::advance
+crates/core/src/cursor.rs:209:5: replace gallop -> usize with 0
+crates/core/src/cursor.rs:209:13: replace >= with < in gallop
+crates/core/src/cursor.rs:214:39: replace && with || in gallop
+crates/core/src/cursor.rs:214:22: replace < with == in gallop
+crates/core/src/cursor.rs:214:22: replace < with > in gallop
+crates/core/src/cursor.rs:214:22: replace < with <= in gallop
+crates/core/src/cursor.rs:214:15: replace + with - in gallop
+crates/core/src/cursor.rs:214:15: replace + with * in gallop
+crates/core/src/cursor.rs:214:67: replace < with == in gallop
+crates/core/src/cursor.rs:214:67: replace < with > in gallop
+crates/core/src/cursor.rs:214:55: replace + with - in gallop
+crates/core/src/cursor.rs:214:55: replace + with * in gallop
+crates/core/src/cursor.rs:215:13: replace += with -= in gallop
+crates/core/src/cursor.rs:215:13: replace += with *= in gallop
+crates/core/src/cursor.rs:218:21: replace + with - in gallop
+crates/core/src/cursor.rs:220:9: replace + with - in gallop
+crates/core/src/cursor.rs:222:22: replace < with <= in gallop
+crates/core/src/topk.rs:38:17: delete match arm (true, false) in <impl Ord for Candidate>::cmp
+crates/core/src/topk.rs:39:17: delete match arm (false, true) in <impl Ord for Candidate>::cmp
+crates/core/src/topk.rs:51:9: replace <impl PartialOrd for Candidate>::partial_cmp -> Option<Ordering> with None
+crates/core/src/topk.rs:75:9: replace TopK::threshold -> f32 with 0.0
+crates/core/src/topk.rs:75:9: replace TopK::threshold -> f32 with 1.0
+crates/core/src/topk.rs:75:9: replace TopK::threshold -> f32 with -1.0
+crates/core/src/topk.rs:75:28: replace < with == in TopK::threshold
+crates/core/src/topk.rs:75:28: replace < with > in TopK::threshold
+crates/core/src/topk.rs:75:28: replace < with <= in TopK::threshold
+crates/core/src/topk.rs:84:9: replace TopK::would_accept -> bool with true
+crates/core/src/topk.rs:84:9: replace TopK::would_accept -> bool with false
+crates/core/src/topk.rs:84:34: replace || with && in TopK::would_accept
+crates/core/src/topk.rs:84:25: replace < with == in TopK::would_accept
+crates/core/src/topk.rs:84:25: replace < with > in TopK::would_accept
+crates/core/src/topk.rs:84:25: replace < with <= in TopK::would_accept
+crates/core/src/topk.rs:84:43: replace > with == in TopK::would_accept
+crates/core/src/topk.rs:84:43: replace > with < in TopK::would_accept
+crates/core/src/topk.rs:84:43: replace > with >= in TopK::would_accept
+crates/core/src/topk.rs:89:9: replace TopK::offer with ()
+crates/core/src/topk.rs:89:19: replace == with != in TopK::offer
+crates/core/src/topk.rs:93:28: replace < with == in TopK::offer
+crates/core/src/topk.rs:93:28: replace < with > in TopK::offer
+crates/core/src/topk.rs:93:28: replace < with <= in TopK::offer
+crates/core/src/topk.rs:101:37: replace == with != in TopK::offer
+crates/core/src/topk.rs:110:9: replace TopK::into_sorted -> Vec<Hit> with vec![]

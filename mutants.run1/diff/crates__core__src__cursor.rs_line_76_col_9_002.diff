@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::idf -> f32 with -1.0
+@@ -68,17 +68,17 @@
+     }
+ 
+     /// Term frequency in the current document.
+     pub fn tf(&self) -> u32 {
+         self.decoded.get(self.at).map_or(0, Posting::tf)
+     }
+ 
+     pub fn idf(&self) -> f32 {
+-        self.idf
++        -1.0 /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     pub fn is_exhausted(&self) -> bool {
+         self.doc().is_none()
+     }
+ 
+     /// Highest score this term can contribute to *any* document.
+     pub fn term_upper_bound(&self) -> f32 {

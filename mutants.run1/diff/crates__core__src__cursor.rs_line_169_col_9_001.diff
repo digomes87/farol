@@ -1,0 +1,44 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::advance_to -> Option<DocId> with Some(Default::default())
+@@ -161,40 +161,17 @@
+     }
+ 
+     /// Moves to the first document `>= target`, returning it.
+     ///
+     /// Never moves backwards, so calling it with a target already behind the
+     /// cursor is a no-op — the pruning loop relies on that to push several
+     /// cursors at the same pivot without tracking which are already there.
+     pub fn advance_to(&mut self, target: DocId) -> Option<DocId> {
+-        if self.doc().is_some_and(|doc| doc >= target) {
+-            return self.doc();
+-        }
+-
+-        // Walk the block index. Nothing here is decoded: one integer per block.
+-        if self.block_last_doc().is_some_and(|last| last < target) {
+-            let mut block = self.block + 1;
+-            let blocks = self.term.blocks();
+-            while block < blocks.len() && blocks[block].last_doc < target {
+-                block += 1;
+-            }
+-            if block >= blocks.len() {
+-                self.load_block(blocks.len());
+-                return None;
+-            }
+-            self.load_block(block);
+-        }
+-
+-        self.at = gallop(&self.decoded, self.at, target);
+-        if self.at >= self.decoded.len() {
+-            let next = self.block + 1;
+-            self.load_block(next);
+-        }
+-        self.doc()
++        Some(Default::default()) /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Moves one posting forward, crossing into the next block if needed.
+     pub fn advance(&mut self) -> Option<DocId> {
+         self.at += 1;
+         if self.at >= self.decoded.len() {
+             let next = self.block + 1;
+             self.load_block(next);

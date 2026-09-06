@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace += with -= in gallop
+@@ -207,17 +207,17 @@
+ /// exponentially widening a window and then bisecting it.
+ fn gallop(postings: &[Posting], from: usize, target: DocId) -> usize {
+     if from >= postings.len() {
+         return postings.len();
+     }
+     let mut step = 1;
+     let mut low = from;
+     while low + step < postings.len() && postings[low + step].doc < target {
+-        low += step;
++        low -= /* ~ changed by cargo-mutants ~ */ step;
+         step *= 2;
+     }
+     let high = (low + step).min(postings.len());
+ 
+     low + postings[low..high]
+         .binary_search_by(|p| {
+             if p.doc < target {
+                 std::cmp::Ordering::Less

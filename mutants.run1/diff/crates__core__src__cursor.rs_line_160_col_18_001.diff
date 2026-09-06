@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace + with * in BlockCursor<'a>::remaining
+@@ -152,17 +152,17 @@
+         let in_block = self.decoded.len().saturating_sub(self.at);
+         let later: usize = self
+             .term
+             .blocks()
+             .iter()
+             .skip(self.block + 1)
+             .map(|meta| meta.count as usize)
+             .sum();
+-        in_block + later
++        in_block * /* ~ changed by cargo-mutants ~ */ later
+     }
+ 
+     /// Moves to the first document `>= target`, returning it.
+     ///
+     /// Never moves backwards, so calling it with a target already behind the
+     /// cursor is a no-op — the pruning loop relies on that to push several
+     /// cursors at the same pivot without tracking which are already there.
+     pub fn advance_to(&mut self, target: DocId) -> Option<DocId> {

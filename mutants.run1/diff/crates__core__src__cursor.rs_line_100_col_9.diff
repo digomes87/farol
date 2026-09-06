@@ -1,0 +1,24 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::block_upper_bound -> f32 with 0.0
+@@ -92,20 +92,17 @@
+ 
+     /// Highest score this term can contribute to a document *in the current
+     /// block*.
+     ///
+     /// Tighter than the term-wide bound, because a block covers a narrow slice
+     /// of the collection — which is exactly what makes block-max pruning skip
+     /// more than plain WAND.
+     pub fn block_upper_bound(&self) -> f32 {
+-        self.term.blocks().get(self.block).map_or(0.0, |meta| {
+-            self.bm25
+-                .score(meta.max_tf, meta.min_len, self.avg_doc_len, self.idf)
+-        })
++        0.0 /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// First block at or after the current one that can contain `doc`.
+     ///
+     /// Walks block metadata only — no decoding — which is what lets the pruning
+     /// loop ask about a document the cursor has not reached yet.
+     fn block_covering(&self, doc: DocId) -> Option<usize> {
+         let blocks = self.term.blocks();

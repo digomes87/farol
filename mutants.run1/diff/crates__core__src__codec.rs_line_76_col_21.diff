@@ -1,0 +1,21 @@
+--- crates/core/src/codec.rs
++++ replace >= with < in decode_sorted
+@@ -68,17 +68,17 @@
+ }
+ 
+ /// Decodes `count` delta encoded values, returning them and the bytes consumed.
+ pub fn decode_sorted(bytes: &[u8], count: usize) -> (Vec<u32>, usize) {
+     let mut values = Vec::with_capacity(count);
+     let mut consumed = 0;
+     let mut previous = 0u32;
+     for _ in 0..count {
+-        if consumed >= bytes.len() {
++        if consumed < /* ~ changed by cargo-mutants ~ */ bytes.len() {
+             break;
+         }
+         let (delta, used) = read_varint(&bytes[consumed..]);
+         consumed += used;
+         previous = previous.saturating_add(delta);
+         values.push(previous);
+     }
+     (values, consumed)

@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::tf -> u32 with 0
+@@ -64,17 +64,17 @@
+ 
+     /// Document the cursor points at, or `None` once exhausted.
+     pub fn doc(&self) -> Option<DocId> {
+         self.decoded.get(self.at).map(|p| p.doc)
+     }
+ 
+     /// Term frequency in the current document.
+     pub fn tf(&self) -> u32 {
+-        self.decoded.get(self.at).map_or(0, Posting::tf)
++        0 /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     pub fn idf(&self) -> f32 {
+         self.idf
+     }
+ 
+     pub fn is_exhausted(&self) -> bool {
+         self.doc().is_none()

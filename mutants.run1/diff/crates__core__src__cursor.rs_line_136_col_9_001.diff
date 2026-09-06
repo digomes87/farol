@@ -1,0 +1,22 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::block_last_doc_at -> Option<DocId> with Some(Default::default())
+@@ -128,18 +128,17 @@
+             }
+             // The term has nothing left at or after `doc`.
+             None => 0.0,
+         }
+     }
+ 
+     /// Last document of the block that would contain `doc`.
+     pub fn block_last_doc_at(&self, doc: DocId) -> Option<DocId> {
+-        self.block_covering(doc)
+-            .map(|idx| self.term.blocks()[idx].last_doc)
++        Some(Default::default()) /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Index of the block the cursor is currently in.
+     pub fn block_index(&self) -> usize {
+         self.block
+     }
+ 
+     /// Last document id of the current block, for deciding where to skip to.

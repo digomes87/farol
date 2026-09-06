@@ -1,0 +1,21 @@
+--- crates/core/src/bm25.rs
++++ replace / with % in Bm25::score
+@@ -69,17 +69,17 @@
+     ///                tf + k1 * (1 - b + b * len/avg)
+     /// ```
+     pub fn score(&self, tf: u32, doc_len: u32, avg_doc_len: f32, idf: f32) -> f32 {
+         if tf == 0 || avg_doc_len <= 0.0 {
+             return 0.0;
+         }
+         let tf = tf as f32;
+         let norm = 1.0 - self.b + self.b * (doc_len as f32 / avg_doc_len);
+-        idf * (tf * (self.k1 + 1.0)) / (tf + self.k1 * norm)
++        idf * (tf * (self.k1 + 1.0)) % /* ~ changed by cargo-mutants ~ */ (tf + self.k1 * norm)
+     }
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+ 
+     const AVG: f32 = 100.0;

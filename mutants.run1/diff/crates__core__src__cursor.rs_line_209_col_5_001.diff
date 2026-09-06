@@ -1,0 +1,40 @@
+--- crates/core/src/cursor.rs
++++ replace gallop -> usize with 1
+@@ -201,36 +201,17 @@
+         }
+         self.doc()
+     }
+ }
+ 
+ /// Index of the first posting `>= target` at or after `from`, found by
+ /// exponentially widening a window and then bisecting it.
+ fn gallop(postings: &[Posting], from: usize, target: DocId) -> usize {
+-    if from >= postings.len() {
+-        return postings.len();
+-    }
+-    let mut step = 1;
+-    let mut low = from;
+-    while low + step < postings.len() && postings[low + step].doc < target {
+-        low += step;
+-        step *= 2;
+-    }
+-    let high = (low + step).min(postings.len());
+-
+-    low + postings[low..high]
+-        .binary_search_by(|p| {
+-            if p.doc < target {
+-                std::cmp::Ordering::Less
+-            } else {
+-                std::cmp::Ordering::Greater
+-            }
+-        })
+-        .unwrap_or_else(|insertion| insertion)
++    1 /* ~ changed by cargo-mutants ~ */
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+     use crate::analyzer::Analyzer;
+     use crate::index::{Index, BLOCK_SIZE};
+ 

@@ -1,0 +1,29 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::remaining -> usize with 0
+@@ -144,25 +144,17 @@
+ 
+     /// Last document id of the current block, for deciding where to skip to.
+     pub fn block_last_doc(&self) -> Option<DocId> {
+         self.term.blocks().get(self.block).map(|meta| meta.last_doc)
+     }
+ 
+     /// Postings left, including the current one. Used to report pruning.
+     pub fn remaining(&self) -> usize {
+-        let in_block = self.decoded.len().saturating_sub(self.at);
+-        let later: usize = self
+-            .term
+-            .blocks()
+-            .iter()
+-            .skip(self.block + 1)
+-            .map(|meta| meta.count as usize)
+-            .sum();
+-        in_block + later
++        0 /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Moves to the first document `>= target`, returning it.
+     ///
+     /// Never moves backwards, so calling it with a target already behind the
+     /// cursor is a no-op — the pruning loop relies on that to push several
+     /// cursors at the same pivot without tracking which are already there.
+     pub fn advance_to(&mut self, target: DocId) -> Option<DocId> {

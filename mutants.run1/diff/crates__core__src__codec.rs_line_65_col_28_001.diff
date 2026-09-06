@@ -1,0 +1,21 @@
+--- crates/core/src/codec.rs
++++ replace - with / in encode_sorted
+@@ -57,17 +57,17 @@
+ 
+ /// Encodes a strictly increasing sequence as deltas, appending to `out`.
+ ///
+ /// The first value is written as is; every later one as its distance from its
+ /// predecessor.
+ pub fn encode_sorted(values: &[u32], out: &mut Vec<u8>) {
+     let mut previous = 0u32;
+     for &value in values {
+-        write_varint(value - previous, out);
++        write_varint(value / /* ~ changed by cargo-mutants ~ */ previous, out);
+         previous = value;
+     }
+ }
+ 
+ /// Decodes `count` delta encoded values, returning them and the bytes consumed.
+ pub fn decode_sorted(bytes: &[u8], count: usize) -> (Vec<u32>, usize) {
+     let mut values = Vec::with_capacity(count);
+     let mut consumed = 0;

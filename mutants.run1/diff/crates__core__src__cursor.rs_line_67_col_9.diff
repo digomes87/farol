@@ -1,0 +1,21 @@
+--- crates/core/src/cursor.rs
++++ replace BlockCursor<'a>::doc -> Option<DocId> with None
+@@ -59,17 +59,17 @@
+             self.term.decode_block(block)
+         } else {
+             Vec::new()
+         };
+     }
+ 
+     /// Document the cursor points at, or `None` once exhausted.
+     pub fn doc(&self) -> Option<DocId> {
+-        self.decoded.get(self.at).map(|p| p.doc)
++        None /* ~ changed by cargo-mutants ~ */
+     }
+ 
+     /// Term frequency in the current document.
+     pub fn tf(&self) -> u32 {
+         self.decoded.get(self.at).map_or(0, Posting::tf)
+     }
+ 
+     pub fn idf(&self) -> f32 {

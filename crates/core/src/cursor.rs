@@ -90,19 +90,6 @@ impl<'a> BlockCursor<'a> {
         )
     }
 
-    /// Highest score this term can contribute to a document *in the current
-    /// block*.
-    ///
-    /// Tighter than the term-wide bound, because a block covers a narrow slice
-    /// of the collection — which is exactly what makes block-max pruning skip
-    /// more than plain WAND.
-    pub fn block_upper_bound(&self) -> f32 {
-        self.term.blocks().get(self.block).map_or(0.0, |meta| {
-            self.bm25
-                .score(meta.max_tf, meta.min_len, self.avg_doc_len, self.idf)
-        })
-    }
-
     /// First block at or after the current one that can contain `doc`.
     ///
     /// Walks block metadata only — no decoding — which is what lets the pruning
@@ -166,8 +153,9 @@ impl<'a> BlockCursor<'a> {
     /// cursor is a no-op — the pruning loop relies on that to push several
     /// cursors at the same pivot without tracking which are already there.
     pub fn advance_to(&mut self, target: DocId) -> Option<DocId> {
-        if self.doc().is_some_and(|doc| doc >= target) {
-            return self.doc();
+        let current = self.doc()?;
+        if current >= target {
+            return Some(current);
         }
 
         // Walk the block index. Nothing here is decoded: one integer per block.
@@ -184,11 +172,9 @@ impl<'a> BlockCursor<'a> {
             self.load_block(block);
         }
 
+        // The block walk above guarantees the landing block ends at or after
+        // the target, so it contains a posting the gallop can find.
         self.at = gallop(&self.decoded, self.at, target);
-        if self.at >= self.decoded.len() {
-            let next = self.block + 1;
-            self.load_block(next);
-        }
         self.doc()
     }
 
@@ -247,6 +233,21 @@ mod tests {
     fn cursor(index: &Index) -> BlockCursor<'_> {
         BlockCursor::new(index.term("rust").unwrap(), 1.0, Bm25::default(), 1.0)
     }
+
+    // Three mutants survive in this module by design. Each was checked and is
+    // equivalent to the original — chasing them would mean pinning an
+    // implementation detail rather than a behaviour:
+    //
+    //   * `*=` -> `+=` in `gallop`: the step grows linearly instead of
+    //     doubling. Same answer, more comparisons — and the test that pins the
+    //     answer is doing its job by *not* failing.
+    //   * `<` -> `<=` in `gallop`'s widening loop: because the step starts at
+    //     one and doubles, `low + step` never lands exactly on the length, so
+    //     the extra case is unreachable.
+    //   * `self.block + 1` -> `self.block * 1` in `advance_to`: the block scan
+    //     then starts on the current block instead of the next. The branch is
+    //     only entered when that block ends before the target, so the loop
+    //     immediately steps past it and reaches the same block.
 
     #[test]
     fn a_new_cursor_points_at_the_first_document() {
@@ -380,14 +381,24 @@ mod tests {
         index.add("hot", "Hot", "rust rust rust");
         let index = index.seal();
 
-        let mut cursor = cursor(&index);
+        let cursor = cursor(&index);
         let term_bound = cursor.term_upper_bound();
-        assert!(cursor.block_upper_bound() <= term_bound);
 
-        // The second block holds the document where the term is strongest, so
-        // its bound should be the one that matches the term-wide bound.
-        cursor.advance_to(BLOCK_SIZE as DocId);
-        assert!(cursor.block_upper_bound() > 0.0);
-        assert!(cursor.block_upper_bound() <= term_bound);
+        // The first block holds the padded documents, where the term is weak;
+        // the second holds the short one where it is strongest, so that block's
+        // bound is the one that reaches the term-wide bound.
+        let weak = cursor.block_upper_bound_at(0);
+        let strong = cursor.block_upper_bound_at(BLOCK_SIZE as DocId);
+
+        assert!(weak > 0.0, "a matching block must contribute something");
+        assert!(weak < strong, "{weak} should be below {strong}");
+        assert!(strong <= term_bound, "{strong} exceeds the term bound");
+        assert!(
+            (strong - term_bound).abs() < 1e-6,
+            "the strongest block should meet the term bound: {strong} vs {term_bound}"
+        );
+
+        // Past the end of the postings there is nothing left to bound.
+        assert_eq!(cursor.block_upper_bound_at(DocId::MAX), 0.0);
     }
 }

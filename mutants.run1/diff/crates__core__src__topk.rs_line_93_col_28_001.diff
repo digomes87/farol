@@ -1,0 +1,21 @@
+--- crates/core/src/topk.rs
++++ replace < with > in TopK::offer
+@@ -85,17 +85,17 @@
+     }
+ 
+     /// Offers a scored document, keeping it only if it belongs in the top `k`.
+     pub fn offer(&mut self, doc: DocId, score: f32) {
+         if self.k == 0 {
+             return;
+         }
+         let candidate = Candidate { doc, score };
+-        if self.heap.len() < self.k {
++        if self.heap.len() > /* ~ changed by cargo-mutants ~ */ self.k {
+             self.heap.push(candidate);
+             return;
+         }
+         // `Less` means "better" under this reversed ordering. Equality keeps
+         // the incumbent, so ties resolve towards the document seen first —
+         // which, since documents arrive in ascending id order, is the lower id.
+         if let Some(worst) = self.heap.peek() {
+             if candidate.cmp(worst) == Ordering::Less {
