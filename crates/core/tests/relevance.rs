@@ -28,9 +28,23 @@ fn top(engine: &Engine, query: &str) -> String {
 
 #[test]
 fn every_corpus_document_is_indexed() {
+    // Counted from the directory rather than hard-coded: an assertion that
+    // breaks when someone adds a document is testing the fixture, not the
+    // crawler.
+    let on_disk = std::fs::read_dir(corpus())
+        .expect("corpus is readable")
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "md"))
+        .count();
+
     let stats = engine().stats();
-    assert_eq!(stats.documents, 7);
-    assert!(stats.vocabulary > 100, "vocabulary looks too small");
+    assert_eq!(stats.documents, on_disk);
+    assert!(
+        stats.vocabulary > stats.documents * 10,
+        "{} terms across {} documents is too few to be a real index",
+        stats.vocabulary,
+        stats.documents
+    );
 }
 
 #[test]

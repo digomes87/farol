@@ -276,6 +276,33 @@ MIRIFLAGS="-Zmiri-strict-provenance" cargo +nightly miri test -p farol-core --li
 
 All four run in CI.
 
+### Are the tests real?
+
+A suite that only exercises fixtures rots: the numbers in it stop describing
+anything and start describing themselves. Two habits keep this one honest.
+
+**Most assertions compare two implementations, not a recorded value.** Pruned
+search against exhaustive scoring, the galloping skip against a linear scan, the
+mapped index against the in-memory one, `stem(stem(x))` against `stem(x)`. Those
+stay meaningful no matter how the sample corpus changes, and they have caught
+real bugs: two in block-max WAND, one in the snapshot cell (found by loom), and
+the missing `finish()` that became the type-state.
+
+**The rest is measured with mutation testing.** `cargo mutants` rewrites the
+code — flips a comparison, replaces a return value — and reports which changes
+no test noticed:
+
+```bash
+cargo mutants -p farol-core --file crates/core/src/bm25.rs
+```
+
+It is not run in CI (it takes minutes per module), but it is how the weak spots
+above were found. The last sweep of the ranking and cursor modules left eleven
+survivors, all of the same kind: tests that pinned a *direction* rather than a
+*value*, so mutating the arithmetic inside BM25 kept "rarer terms score higher"
+true while the formula was wrong. They are now pinned against the formula
+written out independently in the test.
+
 The tests in [`crates/core/tests/relevance.rs`](crates/core/tests/relevance.rs)
 pin which document must rank first for realistic queries over the sample corpus.
 They are the safety net against the worst kind of search regression: the one

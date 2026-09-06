@@ -84,6 +84,57 @@ mod tests {
 
     const AVG: f32 = 100.0;
 
+    /// The formula under test, written out independently of the implementation.
+    ///
+    /// Asserting only that IDF falls as a term gets commoner leaves most of the
+    /// expression free to be wrong — mutation testing showed that swapping the
+    /// operators inside it kept every directional test passing. Pinning the
+    /// value closes that.
+    fn expected_idf(doc_freq: u32, total_docs: usize) -> f32 {
+        let n = total_docs as f64;
+        let df = doc_freq as f64;
+        ((1.0 + (n - df + 0.5) / (df + 0.5)).ln()) as f32
+    }
+
+    #[test]
+    fn idf_matches_the_probabilistic_formula() {
+        let bm25 = Bm25::default();
+        for (df, n) in [
+            (1, 10),
+            (1, 1_000),
+            (5, 10),
+            (9, 10),
+            (500, 1_000),
+            (1_000, 1_000),
+        ] {
+            let expected = expected_idf(df, n);
+            let got = bm25.idf(df, n);
+            assert!(
+                (got - expected).abs() < 1e-5,
+                "idf(df={df}, n={n}) = {got}, expected {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn idf_falls_monotonically_across_the_whole_range() {
+        let bm25 = Bm25::default();
+        let curve: Vec<f32> = (1..=1_000).map(|df| bm25.idf(df, 1_000)).collect();
+        assert!(
+            curve.windows(2).all(|w| w[0] > w[1]),
+            "idf must strictly decrease as the term becomes commoner"
+        );
+        // And the ends are pinned, so a rescaled curve is not mistaken for the
+        // right one: ln(1 + 999.5/1.5) for the rarest term, and almost nothing
+        // for one present in every document.
+        assert!(
+            (curve[0] - 6.503_29).abs() < 1e-4,
+            "idf(1, 1000) = {}",
+            curve[0]
+        );
+        assert!(curve[999] < 0.001, "idf(1000, 1000) = {}", curve[999]);
+    }
+
     #[test]
     fn idf_falls_as_the_term_becomes_common() {
         let bm25 = Bm25::default();
@@ -96,6 +147,60 @@ mod tests {
     fn idf_never_goes_negative_for_ubiquitous_terms() {
         let bm25 = Bm25::default();
         assert!(bm25.idf(1_000, 1_000) >= 0.0);
+    }
+
+    /// The scoring formula, written out independently of the implementation.
+    fn expected_score(bm25: Bm25, tf: u32, doc_len: u32, avg: f32, idf: f32) -> f32 {
+        let tf = f64::from(tf);
+        let k1 = f64::from(bm25.k1);
+        let b = f64::from(bm25.b);
+        let norm = 1.0 - b + b * (f64::from(doc_len) / f64::from(avg));
+        (f64::from(idf) * (tf * (k1 + 1.0)) / (tf + k1 * norm)) as f32
+    }
+
+    #[test]
+    fn score_matches_the_bm25_formula() {
+        // Directional tests — more occurrences score higher, longer documents
+        // score lower — leave the arithmetic itself free to be wrong: mutation
+        // testing showed that turning the length ratio into a product kept them
+        // all passing. Pinning the value is what closes that.
+        let cases = [
+            (Bm25::default(), 1, 100, 100.0, 1.0),
+            (Bm25::default(), 7, 30, 100.0, 2.5),
+            (Bm25::default(), 3, 400, 100.0, 0.8),
+            (Bm25::new(2.0, 0.3), 4, 50, 120.0, 1.7),
+            (Bm25::new(0.4, 1.0), 9, 250, 80.0, 3.1),
+        ];
+        for (bm25, tf, len, avg, idf) in cases {
+            let expected = expected_score(bm25, tf, len, avg, idf);
+            let got = bm25.score(tf, len, avg, idf);
+            assert!(
+                (got - expected).abs() < 1e-4,
+                "score(tf={tf}, len={len}, avg={avg}, idf={idf}) = {got}, expected {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn length_normalisation_uses_the_ratio_to_the_average() {
+        let bm25 = Bm25::default();
+        // A document of exactly average length is the fixed point: the
+        // normalisation factor is 1, so the score depends only on tf and idf.
+        let average = bm25.score(3, 100, 100.0, 1.0);
+        let unnormalised = Bm25::new(1.2, 0.0).score(3, 100, 100.0, 1.0);
+        assert!(
+            (average - unnormalised).abs() < 1e-6,
+            "at the average length, b should not matter: {average} vs {unnormalised}"
+        );
+
+        // And doubling the length must move the score the same way doubling the
+        // ratio does, which a product instead of a division would not.
+        let doubled_length = bm25.score(3, 200, 100.0, 1.0);
+        let halved_average = bm25.score(3, 100, 50.0, 1.0);
+        assert!(
+            (doubled_length - halved_average).abs() < 1e-6,
+            "{doubled_length} vs {halved_average}"
+        );
     }
 
     #[test]
@@ -142,8 +247,15 @@ mod tests {
     #[test]
     fn absent_terms_and_empty_indexes_score_zero() {
         let bm25 = Bm25::default();
-        assert_eq!(bm25.score(0, 100, AVG, 3.0), 0.0);
-        assert_eq!(bm25.score(5, 100, 0.0, 3.0), 0.0);
+        // Each guard alone must be enough: a term that does not occur scores
+        // zero even in a healthy index, and an index with no documents scores
+        // zero even for a term that does occur.
+        assert_eq!(bm25.score(0, 100, AVG, 3.0), 0.0, "tf = 0");
+        assert_eq!(bm25.score(5, 100, 0.0, 3.0), 0.0, "empty index");
+        assert_eq!(bm25.score(0, 100, 0.0, 3.0), 0.0, "both");
+        // …and with neither condition present, the score must not be zero,
+        // otherwise the guard is swallowing real matches.
+        assert!(bm25.score(5, 100, AVG, 3.0) > 0.0, "healthy match");
     }
 
     #[test]

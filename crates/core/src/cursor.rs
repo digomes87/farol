@@ -334,6 +334,44 @@ mod tests {
     }
 
     #[test]
+    fn block_covering_finds_the_block_a_document_lives_in() {
+        let index = index_with(BLOCK_SIZE * 3, 1);
+        let cursor = cursor(&index);
+
+        // Documents map to blocks of BLOCK_SIZE, so the arithmetic is known
+        // independently of the implementation.
+        for doc in [0, 5, BLOCK_SIZE - 1, BLOCK_SIZE, BLOCK_SIZE * 2 + 3] {
+            let expected = doc / BLOCK_SIZE;
+            assert_eq!(
+                cursor.block_covering(doc as DocId),
+                Some(expected),
+                "document {doc} should be in block {expected}"
+            );
+            assert_eq!(
+                cursor.block_last_doc_at(doc as DocId),
+                Some((expected * BLOCK_SIZE + BLOCK_SIZE - 1) as DocId),
+                "wrong block end for document {doc}"
+            );
+        }
+
+        // Past the last posting there is no covering block at all.
+        assert_eq!(cursor.block_covering((BLOCK_SIZE * 3) as DocId), None);
+        assert_eq!(cursor.block_last_doc_at((BLOCK_SIZE * 3) as DocId), None);
+    }
+
+    #[test]
+    fn block_covering_never_looks_behind_the_cursor() {
+        let index = index_with(BLOCK_SIZE * 3, 1);
+        let mut cursor = cursor(&index);
+        cursor.advance_to((BLOCK_SIZE * 2) as DocId);
+
+        // The cursor is in block 2; a document from block 0 is behind it and
+        // has no covering block ahead.
+        assert_eq!(cursor.block_covering(0), Some(2));
+        assert_eq!(cursor.block_index(), 2);
+    }
+
+    #[test]
     fn a_block_bound_is_never_looser_than_the_term_bound() {
         let mut index = Index::new(Analyzer::raw());
         for id in 0..BLOCK_SIZE {

@@ -2,3 +2,5 @@
 **/*.rs.bk
 *.farol
 .DS_Store
+/mutants.out
+/mutants.out.old
