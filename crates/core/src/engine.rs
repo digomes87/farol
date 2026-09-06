@@ -53,6 +53,8 @@ pub struct Stats {
     pub vocabulary: usize,
     pub postings: usize,
     pub avg_doc_len: f32,
+    /// Bytes of compressed posting data.
+    pub postings_bytes: usize,
 }
 
 /// A complete search engine over a document collection.
@@ -194,6 +196,7 @@ impl Engine {
             vocabulary: self.index.vocabulary_size(),
             postings: self.index.total_postings(),
             avg_doc_len: self.index.avg_doc_len(),
+            postings_bytes: self.index.postings_bytes(),
         }
     }
 

@@ -144,7 +144,7 @@ impl<'a> Searcher<'a> {
     /// preceding cursor is already on it — or skips those cursors straight to
     /// it, never touching what lies in between.
     fn search_wand(&self, query: &Query, limit: usize) -> (Vec<Hit>, SearchStats) {
-        let mut cursors: Vec<PostingCursor<'_>> = Vec::new();
+        let mut decoded: Vec<(Vec<Posting>, f32, f32)> = Vec::new();
         let mut candidates: HashSet<DocId> = HashSet::new();
 
         for clause in &query.clauses {
@@ -161,9 +161,15 @@ impl<'a> Searcher<'a> {
                 self.index.avg_doc_len(),
                 idf,
             );
-            candidates.extend(term_index.postings().iter().map(|p| p.doc));
-            cursors.push(PostingCursor::new(term_index.postings(), idf, upper_bound));
+            let postings = term_index.decode_all();
+            candidates.extend(postings.iter().map(|p| p.doc));
+            decoded.push((postings, idf, upper_bound));
         }
+
+        let mut cursors: Vec<PostingCursor<'_>> = decoded
+            .iter()
+            .map(|(postings, idf, upper_bound)| PostingCursor::new(postings, *idf, *upper_bound))
+            .collect();
 
         let mut stats = SearchStats {
             candidates: candidates.len(),
@@ -310,14 +316,18 @@ impl<'a> Searcher<'a> {
     /// documents that can possibly match, so the positional check — the
     /// expensive part — runs as few times as possible.
     fn resolve_phrase(&self, parts: &[(String, u32)]) -> Vec<(DocId, u32)> {
-        let mut lists: Vec<(&[Posting], u32)> = Vec::with_capacity(parts.len());
+        let mut owned: Vec<(Vec<Posting>, u32)> = Vec::with_capacity(parts.len());
         for (term, offset) in parts {
             match self.index.postings(term) {
                 // One missing term is enough to rule out the whole phrase.
                 None => return Vec::new(),
-                Some(postings) => lists.push((postings, *offset)),
+                Some(postings) => owned.push((postings, *offset)),
             }
         }
+        let lists: Vec<(&[Posting], u32)> = owned
+            .iter()
+            .map(|(postings, offset)| (postings.as_slice(), *offset))
+            .collect();
 
         let pivot = lists
             .iter()

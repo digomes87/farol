@@ -133,6 +133,18 @@ pub fn stats(stats: &Stats, path: &str, style: &Style) -> String {
         ("vocabulary", format!("{} terms", stats.vocabulary)),
         ("postings", stats.postings.to_string()),
         ("avg length", format!("{:.1} terms/doc", stats.avg_doc_len)),
+        (
+            "postings size",
+            format!(
+                "{:.1} KiB ({:.2} bytes/posting)",
+                stats.postings_bytes as f64 / 1024.0,
+                if stats.postings > 0 {
+                    stats.postings_bytes as f64 / stats.postings as f64
+                } else {
+                    0.0
+                }
+            ),
+        ),
     ];
     rows.iter()
         .map(|(label, value)| format!("{:<16}{}\n", style.dim(label), value))
